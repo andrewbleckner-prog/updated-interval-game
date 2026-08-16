@@ -11,6 +11,7 @@ export type SizeName =
   | 'sixth'
   | 'seventh'
   | 'octave';
+export type Clef = 'treble' | 'bass';
 
 export interface Note {
   // Diatonic letter index: 0=C, 1=D, 2=E, 3=F, 4=G, 5=A, 6=B
@@ -190,17 +191,30 @@ function isValidCombo(quality: Quality, size: SizeName, compound: boolean): bool
 }
 
 /**
- * Given an interval, produce a pair of notes with random accidentals.
+ * Given an interval and clef, produce a pair of notes with random accidentals.
  * The low note gets a random accidental (when possible), and the high
  * note's accidental is computed to produce the exact target interval.
+ *
+ * Pitch ranges:
+ * - Treble: low notes start around C4 (diatonic step 28), pos 10 (1 ledger line below)
+ * - Bass: low notes start around E2 (diatonic step 16), pos 10 (1 ledger line below)
+ * Both maintain identical relative positions and headroom on their respective staves.
  */
-function notesForInterval(interval: Interval): { low: Note; high: Note } {
+function notesForInterval(interval: Interval, clef: Clef): { low: Note; high: Note } {
   const genericSteps = genericNumber(interval.size) - 1 + (interval.compound ? 7 : 0);
-  const lowLetter = Math.floor(Math.random() * 7);
-  const lowOctave = 4;
-  const highLetterRaw = lowLetter + genericSteps;
-  const highOctave = lowOctave + Math.floor(highLetterRaw / 7);
-  const highLetter = ((highLetterRaw % 7) + 7) % 7;
+  // Expand base pitch range: allow low notes to start 0-3 diatonic steps up for compound
+  // and 0-6 diatonic steps up for simple intervals.
+  const maxStepOffset = interval.compound ? 3 : 6;
+  const stepOffset = Math.floor(Math.random() * (maxStepOffset + 1));
+
+  const baseDiatonic = clef === 'treble' ? 4 * 7 + 0 : 2 * 7 + 2; // C4 (28) for treble, E2 (16) for bass
+  const lowDiatonic = baseDiatonic + stepOffset;
+  const lowOctave = Math.floor(lowDiatonic / 7);
+  const lowLetter = lowDiatonic % 7;
+
+  const highDiatonic = lowDiatonic + genericSteps;
+  const highOctave = Math.floor(highDiatonic / 7);
+  const highLetter = highDiatonic % 7;
 
   // Natural semitone span of the chosen letters.
   const lowNat = (lowOctave + 1) * 12 + LETTER_SEMITONE[lowLetter];
@@ -232,44 +246,54 @@ function notesForInterval(interval: Interval): { low: Note; high: Note } {
   };
 }
 
-/** Generate a random valid interval + note pair, avoiding the previous interval. */
-export function generateQuestion(previous?: Interval): {
+export interface Question {
   interval: Interval;
   low: Note;
   high: Note;
-} {
+  clef: Clef;
+}
+
+/** Generate a random valid interval + note pair, continuously alternating between treble and bass clef. */
+export function generateQuestion(previous?: Question): Question {
   let interval: Interval;
   let attempts = 0;
+  // Continuously alternates clefs: treble -> bass -> treble -> bass...
+  const clef: Clef = previous ? (previous.clef === 'treble' ? 'bass' : 'treble') : 'treble';
+
   do {
     const quality = ALL_QUALITIES[Math.floor(Math.random() * ALL_QUALITIES.length)];
     const size = ALL_SIZES[Math.floor(Math.random() * ALL_SIZES.length)];
-    const compound = Math.random() < 0.25; // 25% chance of compound
+    const compound = Math.random() < 0.30; // 30% chance of compound
     interval = { quality, size, compound };
     if (!isValidCombo(quality, size, compound)) continue;
     attempts++;
   } while (
     (!isValidCombo(interval.quality, interval.size, interval.compound) ||
-      (previous && intervalsEqual(interval, previous))) &&
+      (previous && intervalsEqual(interval, previous.interval))) &&
     attempts < 30
   );
 
-  const { low, high } = notesForInterval(interval);
-  return { interval, low, high };
+  const { low, high } = notesForInterval(interval, clef);
+  return { interval, low, high, clef };
 }
 
 // ---------------------------------------------------------------------------
 // Staff geometry helpers
 // ---------------------------------------------------------------------------
 
-const F5: Note = { letter: 3, accidental: 'natural', octave: 5 };
+// Top staff line notes (position 0)
+const TOP_LINE_NOTE: Record<Clef, Note> = {
+  treble: { letter: 3, accidental: 'natural', octave: 5 }, // F5
+  bass: { letter: 5, accidental: 'natural', octave: 3 },   // A3
+};
 
-export function staffPosition(note: Note): number {
-  return diatonicStep(F5) - diatonicStep(note);
+export function staffPosition(note: Note, clef: Clef = 'treble'): number {
+  return diatonicStep(TOP_LINE_NOTE[clef]) - diatonicStep(note);
 }
 
 /** Does the note need ledger lines? Returns count above (negative) or below (positive). */
-export function ledgerInfo(note: Note): { above: number; below: number } {
-  const pos = staffPosition(note);
+export function ledgerInfo(note: Note, clef: Clef = 'treble'): { above: number; below: number } {
+  const pos = staffPosition(note, clef);
   let above = 0;
   let below = 0;
   if (pos < 0) above = Math.floor((-pos) / 2);

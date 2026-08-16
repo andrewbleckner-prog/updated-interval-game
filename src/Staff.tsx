@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import {
   type Note,
   type Accidental,
+  type Clef,
   staffPosition,
   ledgerInfo,
   ACC_SYMBOL,
@@ -11,6 +12,7 @@ import {
 // SMuFL Bravura glyph codepoints.
 const GLYPH = {
   trebleClef: '\uE050',
+  bassClef: '\uE062',
   flat: '\uE260',
   natural: '\uE261',
   sharp: '\uE262',
@@ -22,14 +24,14 @@ const SPACE = 14;
 const STAFF_LEFT = 60;
 const STAFF_WIDTH = 300;
 const STAFF_RIGHT = STAFF_LEFT + STAFF_WIDTH;
-const TOP_LINE_Y = 40; // y of the top staff line (F5)
+const TOP_LINE_Y = 50; // y of the top staff line
 
 // SMuFL standard: font em = 4 staff spaces.
 const MUSIC_FONT_SIZE = SPACE * 4;
 const STEM_LENGTH = SPACE * 3.5;
 const STEM_WIDTH = 1.6;
 
-// Convert staff position (0 = top line F5) to SVG y.
+// Convert staff position (0 = top line) to SVG y.
 function posY(staffPos: number): number {
   return TOP_LINE_Y + staffPos * (SPACE / 2);
 }
@@ -43,13 +45,14 @@ const ACC_GLYPH: Record<Accidental, string> = {
 interface StaffProps {
   low: Note;
   high: Note;
+  clef?: Clef;
 }
 
-export function Staff({ low, high }: StaffProps) {
-  const lowPos = useMemo(() => staffPosition(low), [low]);
-  const highPos = useMemo(() => staffPosition(high), [high]);
-  const lowLedger = useMemo(() => ledgerInfo(low), [low]);
-  const highLedger = useMemo(() => ledgerInfo(high), [high]);
+export function Staff({ low, high, clef = 'treble' }: StaffProps) {
+  const lowPos = useMemo(() => staffPosition(low, clef), [low, clef]);
+  const highPos = useMemo(() => staffPosition(high, clef), [high, clef]);
+  const lowLedger = useMemo(() => ledgerInfo(low, clef), [low, clef]);
+  const highLedger = useMemo(() => ledgerInfo(high, clef), [high, clef]);
 
   const noteX1 = STAFF_LEFT + 130;
   const noteX2 = STAFF_LEFT + 220;
@@ -163,7 +166,7 @@ export function Staff({ low, high }: StaffProps) {
 
   return (
     <svg
-      viewBox="0 0 380 130"
+      viewBox="0 0 380 155"
       className="w-full h-auto max-w-md"
       role="img"
       aria-label={`Staff showing ${noteLabel(low)} and ${noteLabel(high)}`}
@@ -171,17 +174,30 @@ export function Staff({ low, high }: StaffProps) {
       {/* Staff lines */}
       {staffLines}
 
-      {/* Treble clef — SMuFL origin sits on the G line (position 6). */}
-      <text
-        x={STAFF_LEFT + 2}
-        y={posY(6)}
-        className="bravura"
-        fontSize={MUSIC_FONT_SIZE}
-        fill="#1e2330"
-        dominantBaseline="central"
-      >
-        {GLYPH.trebleClef}
-      </text>
+      {/* Clef glyph — Treble G-clef origin sits on pos 6 (G4 line); Bass F-clef origin sits on pos 2 (F3 line). */}
+      {clef === 'treble' ? (
+        <text
+          x={STAFF_LEFT + 2}
+          y={posY(6)}
+          className="bravura"
+          fontSize={MUSIC_FONT_SIZE}
+          fill="#1e2330"
+          dominantBaseline="central"
+        >
+          {GLYPH.trebleClef}
+        </text>
+      ) : (
+        <text
+          x={STAFF_LEFT + 2}
+          y={posY(2)}
+          className="bravura"
+          fontSize={MUSIC_FONT_SIZE}
+          fill="#1e2330"
+          dominantBaseline="central"
+        >
+          {GLYPH.bassClef}
+        </text>
+      )}
 
       {/* Time signature 4/4 */}
       <text

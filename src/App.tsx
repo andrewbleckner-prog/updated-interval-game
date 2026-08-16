@@ -6,6 +6,7 @@ import {
   type Interval,
   type Quality,
   type SizeName,
+  type Question,
   generateQuestion,
   intervalsEqual,
   noteName,
@@ -20,7 +21,7 @@ type Feedback = 'idle' | 'correct' | 'wrong';
 
 export default function App() {
   const audio = useAudio();
-  const [question, setQuestion] = useState(() => generateQuestion());
+  const [question, setQuestion] = useState<Question>(() => generateQuestion());
   const [selectedQuality, setSelectedQuality] = useState<Quality | null>(null);
   const [selectedSize, setSelectedSize] = useState<SizeName | null>(null);
   const [compound, setCompound] = useState(false);
@@ -34,7 +35,7 @@ export default function App() {
   const questionKey = useRef(0);
 
   const nextQuestion = useCallback(
-    (prev: Interval) => {
+    (prev?: Question) => {
       const q = generateQuestion(prev);
       setQuestion(q);
       setSelectedQuality(null);
@@ -64,7 +65,7 @@ export default function App() {
       setStreak(newStreak);
       if (newStreak > bestStreak) setBestStreak(newStreak);
       audio.playCorrect();
-      window.setTimeout(() => nextQuestion(question.interval), 1700);
+      window.setTimeout(() => nextQuestion(question), 1700);
     } else {
       setFeedback('wrong');
       setWrongAttempts((w) => w + 1);
@@ -132,7 +133,7 @@ export default function App() {
             <div id="staff-card" className="bg-white rounded-2xl shadow-xl border border-ink-200 p-4 sm:p-6 relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-white to-ink-50 opacity-50 pointer-events-none" />
               <div className="relative">
-                <Staff low={question.low} high={question.high} />
+                <Staff low={question.low} high={question.high} clef={question.clef} />
                 <div className="mt-3 flex items-center justify-center gap-4 text-ink-700">
                   <span className="text-sm font-medium">{noteName(question.low)}</span>
                   <span className="text-ink-300">→</span>
@@ -271,7 +272,7 @@ function StartScreen({ onStart, bestStreak }: { onStart: () => void; bestStreak:
   return (
     <div id="start-screen" className="text-center animate-fade-in">
       <p className="text-ink-600 max-w-md mx-auto mb-6">
-        You'll see two notes on a treble staff. Choose the interval's <em>quality</em> and <em>size</em>, toggle <em>compound</em> if it spans more than an octave, then press Select. A bell means correct; a buzzer means try again.
+        You'll see two notes on a treble or bass staff. Choose the interval's <em>quality</em> and <em>size</em>, toggle <em>compound</em> if it spans more than an octave, then press Select. A bell means correct; a buzzer means try again.
       </p>
       <button
         id="start-game-button"
