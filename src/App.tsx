@@ -100,7 +100,7 @@ export default function App() {
   const accuracy = attempts > 0 ? Math.round((score / attempts) * 100) : 0;
 
   return (
-    <div id="interval-app-root" className="min-h-screen text-ink-800 flex flex-col items-center px-4 py-8 sm:py-12">
+    <div id="interval-app-root" className="min-h-screen bg-stone-200/70 text-ink-800 flex flex-col items-center px-4 py-8 sm:py-12">
       {/* Header */}
       <header id="game-header" className="w-full max-w-3xl text-center mb-8 animate-fade-in">
         <div className="inline-flex items-center gap-2 text-amber-600 mb-2">
@@ -110,9 +110,11 @@ export default function App() {
         <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-ink-900">
           Interval Identification
         </h1>
-        <p className="mt-3 text-ink-600 text-base sm:text-lg">
-          Identify the melodic interval between the two notes on the staff.
-        </p>
+        {started && (
+          <p className="mt-3 text-ink-700 text-lg sm:text-xl font-bold">
+            Identify the melodic interval between the two notes on the staff.
+          </p>
+        )}
       </header>
 
       {!started ? (
@@ -270,21 +272,28 @@ export default function App() {
 
 function StartScreen({ onStart, bestStreak }: { onStart: () => void; bestStreak: number }) {
   return (
-    <div id="start-screen" className="text-center animate-fade-in">
-      <p className="text-ink-600 max-w-md mx-auto mb-6">
-        You'll see two notes on a treble or bass staff. Choose the interval's <em>quality</em> and <em>size</em>, toggle <em>compound</em> if it spans more than an octave, then press Select. A bell means correct; a buzzer means try again.
-      </p>
-      <button
-        id="start-game-button"
-        onClick={onStart}
-        className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold text-lg transition-all shadow-lg shadow-amber-500/30"
-      >
-        <Play className="w-5 h-5" />
-        Start
-      </button>
-      {bestStreak > 0 && (
-        <p className="mt-4 text-sm text-ink-500">Best streak so far: {bestStreak}</p>
-      )}
+    <div id="start-screen" className="w-full max-w-xl animate-fade-in">
+      <div id="start-screen-card" className="bg-white rounded-2xl shadow-xl border border-ink-200 p-6 sm:p-8">
+        <h2 className="text-2xl sm:text-3xl font-bold text-ink-900 mb-4 text-center">
+          Directions
+        </h2>
+        <p className="text-ink-700 text-lg sm:text-xl text-left leading-relaxed mb-8">
+          Two consecutive notes appear on a treble or bass staff forming a melodic interval. Choose the interval's <strong>quality</strong> and <strong>size</strong>, toggle <strong>compound</strong> if it spans more than an octave, and then press <strong>Select</strong>. A bell means correct; a buzzer means try again.
+        </p>
+        <div className="flex flex-col items-center">
+          <button
+            id="start-game-button"
+            onClick={onStart}
+            className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold text-lg transition-all shadow-lg shadow-amber-500/30 w-full sm:w-auto"
+          >
+            <Play className="w-5 h-5" />
+            Start
+          </button>
+          {bestStreak > 0 && (
+            <p className="mt-4 text-sm text-ink-500 text-center">Best streak so far: {bestStreak}</p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

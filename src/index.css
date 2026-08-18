@@ -75,7 +75,7 @@ html {
 body {
   margin: 0;
   font-family: 'Inter', system-ui, sans-serif;
-  background: radial-gradient(ellipse at top, #ffffff 0%, #eef1f5 100%);
+  background-color: rgb(231 229 228 / 0.7);
   min-height: 100vh;
 }
 
