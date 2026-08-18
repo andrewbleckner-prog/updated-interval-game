@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { Check, X, Music2, Volume2, RotateCcw, Trophy, Play } from 'lucide-react';
+import { Check, X, Music2, Volume2, SkipForward, Trophy, Play, BookOpen } from 'lucide-react';
 import { Staff } from '@/Staff';
 import { useAudio } from '@/useAudio';
 import {
@@ -32,6 +32,7 @@ export default function App() {
   const [bestStreak, setBestStreak] = useState(0);
   const [wrongAttempts, setWrongAttempts] = useState(0); // wrong attempts on current question
   const [started, setStarted] = useState(false);
+  const [showTheoryTips, setShowTheoryTips] = useState(false);
   const questionKey = useRef(0);
 
   const nextQuestion = useCallback(
@@ -79,6 +80,10 @@ export default function App() {
   const handlePlayInterval = useCallback(() => {
     audio.playNotes([question.low, question.high]);
   }, [audio, question]);
+
+  const handleSkip = useCallback(() => {
+    nextQuestion(question);
+  }, [nextQuestion, question]);
 
   const startGame = useCallback(() => {
     setStarted(true);
@@ -249,17 +254,65 @@ export default function App() {
             )}
           </div>
 
-          {/* Reset */}
-          <div className="flex justify-center pt-2">
+          {/* Bottom actions: Theory Tips (left) & Skip (right) */}
+          <div className="flex items-center justify-between pt-2">
             <button
-              id="restart-game-button"
-              onClick={startGame}
-              className="inline-flex items-center gap-2 text-sm text-ink-500 hover:text-ink-800 transition-colors"
+              id="theory-tips-button"
+              onClick={() => setShowTheoryTips((prev) => !prev)}
+              aria-expanded={showTheoryTips}
+              className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium transition-colors border shadow-sm ${
+                showTheoryTips
+                  ? 'bg-amber-50 border-amber-400 text-amber-900 ring-2 ring-amber-400/20'
+                  : 'bg-white hover:bg-ink-100 text-ink-800 border-ink-300'
+              }`}
             >
-              <RotateCcw className="w-4 h-4" />
-              Restart game
+              <BookOpen className="w-4 h-4 text-amber-600" />
+              Theory Tips
+            </button>
+
+            <button
+              id="skip-question-button"
+              onClick={handleSkip}
+              disabled={feedback === 'correct'}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white hover:bg-ink-100 disabled:opacity-40 disabled:cursor-not-allowed text-ink-800 text-sm font-medium transition-colors border border-ink-300 shadow-sm"
+            >
+              <SkipForward className="w-4 h-4" />
+              Skip
             </button>
           </div>
+
+          {/* Inline Theory Tips White Window */}
+          {showTheoryTips && (
+            <div
+              id="theory-tips-inline-window"
+              className="w-full bg-white rounded-2xl shadow-xl border border-ink-200 p-6 sm:p-8 relative animate-fade-in"
+            >
+              <div className="flex items-start justify-between gap-4 mb-3">
+                <div className="inline-flex items-center gap-2 text-amber-600">
+                  <BookOpen className="w-5 h-5" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-ink-500">Reference Guide</span>
+                </div>
+                <button
+                  id="close-theory-tips-button"
+                  onClick={() => setShowTheoryTips(false)}
+                  className="text-ink-400 hover:text-ink-700 p-1.5 rounded-lg hover:bg-ink-100 transition-colors"
+                  aria-label="Close Theory Tips"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <h3 className="text-xl sm:text-2xl font-bold text-ink-900 mb-4">
+                How to analyze music intervals on the staff.
+              </h3>
+
+              <ul className="space-y-3 text-ink-700 text-base sm:text-lg list-disc list-outside pl-6 leading-relaxed">
+                <li>Determine size first by counting diatonic steps</li>
+                <li>Ignore accidentals and find diatonic quality</li>
+                <li>Add in accidentals one at a time to complete assessment of quality</li>
+              </ul>
+            </div>
+          )}
         </main>
       )}
 
