@@ -124,20 +124,27 @@ export default function App() {
   return (
     <div id="interval-app-root" className="min-h-screen bg-stone-200/70 text-ink-800 flex flex-col items-center px-4 py-8 sm:py-12">
       {/* Header */}
-      <header id="game-header" className="w-full max-w-5xl text-center mb-8 animate-fade-in">
-        <div className="inline-flex items-center gap-2 text-amber-600 mb-2">
-          <Music2 className="w-7 h-7" />
-          <span className="text-sm font-semibold uppercase tracking-[0.2em]">Ear Training</span>
-        </div>
-        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-ink-900">
-          Interval Identification
-        </h1>
-        {started && (
-          <p className="mt-3 text-ink-700 text-lg sm:text-xl font-bold">
+      {!started ? (
+        <header id="game-header" className="w-full max-w-2xl text-center mb-8 animate-fade-in">
+          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-ink-900">
+            Interval Identification
+          </h1>
+        </header>
+      ) : (
+        <header id="game-header" className="w-full max-w-5xl mb-6 animate-fade-in text-left">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-orange-500/80 border border-orange-400/50 flex items-center justify-center shrink-0 shadow-xs backdrop-blur-xs text-white">
+              <Music2 className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink-900 leading-tight">
+              Interval Identification
+            </h1>
+          </div>
+          <p className="mt-1.5 pl-11 sm:pl-12 text-ink-700 text-sm sm:text-base font-semibold">
             Identify the melodic interval between the two notes on the staff.
           </p>
-        )}
-      </header>
+        </header>
+      )}
 
       {!started ? (
         <StartScreen onStart={startGame} bestStreak={bestStreak} />
@@ -152,37 +159,37 @@ export default function App() {
           </div>
 
           {/* Side-by-side: Staff window (left) and Selection window (right) */}
-          <div id="game-workspace" className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+          <div id="game-workspace" className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
             {/* Left column: Staff card & action buttons */}
-            <div id="staff-column" className="flex flex-col gap-3">
+            <div id="staff-column" className="flex flex-col justify-between h-full gap-3">
               {/* Staff card */}
-              <div id="staff-card" className="bg-white rounded-2xl shadow-xl border border-ink-200 p-5 sm:p-6 relative overflow-hidden flex flex-col items-center">
+              <div id="staff-card" className="bg-white rounded-2xl shadow-xl border border-ink-200 p-4 sm:p-5 relative overflow-hidden flex flex-col items-center flex-1 justify-center">
                 <div className="absolute inset-0 bg-gradient-to-br from-white to-ink-50 opacity-50 pointer-events-none" />
                 <div className="relative w-full flex flex-col items-center">
                   <Staff low={question.low} high={question.high} clef={question.clef} />
-                  <div className="mt-3 flex items-center justify-center gap-4 text-ink-700">
-                    <span className="text-sm font-semibold">{noteName(question.low)}</span>
-                    <span className="text-ink-300">→</span>
-                    <span className="text-sm font-semibold">{noteName(question.high)}</span>
+                  <div className="mt-2 flex items-center justify-center gap-4 text-ink-900 font-bold">
+                    <span className="text-sm">{noteName(question.low)}</span>
+                    <span className="text-ink-400">→</span>
+                    <span className="text-sm">{noteName(question.high)}</span>
                   </div>
 
                   {/* Feedback state indicator */}
-                  <div className="mt-3 min-h-[42px] flex items-center justify-center">
+                  <div className="mt-2 min-h-[34px] flex items-center justify-center">
                     {feedback === 'correct' && (
-                      <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 font-bold text-sm animate-pop-in shadow-xs">
-                        <Check className="w-5 h-5 text-emerald-600" strokeWidth={3} />
+                      <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-900 font-bold text-sm animate-pop-in shadow-xs">
+                        <Check className="w-5 h-5 text-emerald-700" strokeWidth={3} />
                         <span>Correct!</span>
                       </div>
                     )}
                     {feedback === 'wrong' && (
-                      <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-rose-100 border border-rose-300 text-rose-800 font-bold text-sm animate-shake shadow-xs">
-                        <X className="w-5 h-5 text-rose-600" strokeWidth={3} />
+                      <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-rose-100 border border-rose-300 text-rose-900 font-bold text-sm animate-shake shadow-xs">
+                        <X className="w-5 h-5 text-rose-700" strokeWidth={3} />
                         <span>Try again</span>
                       </div>
                     )}
                     {feedback === 'idle' && (
-                      <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-ink-100 text-ink-500 font-medium text-xs">
-                        <Music2 className="w-4 h-4 text-ink-400" />
+                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-ink-100 text-ink-700 font-semibold text-xs">
+                        <Music2 className="w-4 h-4 text-ink-600" />
                         <span>Identify melodic interval</span>
                       </div>
                     )}
@@ -190,23 +197,23 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Replay interval button */}
+              {/* Replay interval button - slightly greater height */}
               <button
                 id="replay-interval-button"
                 onClick={handlePlayInterval}
                 disabled={feedback === 'correct'}
-                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-white hover:bg-ink-100 disabled:opacity-40 disabled:cursor-not-allowed text-ink-800 text-sm font-medium transition-colors border border-ink-300 shadow-sm w-full"
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 sm:py-3.5 rounded-xl bg-white hover:bg-ink-100 disabled:opacity-40 disabled:cursor-not-allowed text-ink-950 text-sm sm:text-base font-bold transition-colors border border-ink-300 shadow-sm w-full"
               >
-                <Volume2 className="w-4 h-4" />
-                Play interval again
+                <Volume2 className="w-4 h-4 text-ink-800" />
+                Play Interval
               </button>
 
               {/* Action buttons directly under staff window */}
-              <div className="flex items-center justify-between gap-3 pt-1">
+              <div className="grid grid-cols-2 gap-3 w-full">
                 <button
                   id="theory-tips-button"
                   onClick={() => setShowTheoryTips(true)}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white hover:bg-ink-100 text-ink-800 text-sm font-medium transition-colors border border-ink-300 shadow-sm"
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-white hover:bg-ink-100 text-ink-950 text-sm font-bold transition-colors border border-ink-300 shadow-sm w-full"
                 >
                   <BookOpen className="w-4 h-4 text-amber-600" />
                   Theory Tips
@@ -216,100 +223,101 @@ export default function App() {
                   id="skip-question-button"
                   onClick={handleSkip}
                   disabled={feedback === 'correct'}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white hover:bg-ink-100 disabled:opacity-40 disabled:cursor-not-allowed text-ink-800 text-sm font-medium transition-colors border border-ink-300 shadow-sm"
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-white hover:bg-ink-100 disabled:opacity-40 disabled:cursor-not-allowed text-ink-950 text-sm font-bold transition-colors border border-ink-300 shadow-sm w-full"
                 >
-                  <SkipForward className="w-4 h-4" />
+                  <SkipForward className="w-4 h-4 text-ink-800" />
                   Skip
                 </button>
               </div>
             </div>
 
             {/* Right column: Answer selection window */}
-            <div id="answer-selection-panel" className="bg-white/90 backdrop-blur rounded-2xl border border-ink-200 shadow-xl p-5 sm:p-6 space-y-4">
-              {/* Quality row */}
-              <div>
-                <p className="text-sm font-bold tracking-wide text-ink-900 mb-2">Quality</p>
-                <div className="flex flex-wrap gap-2">
-                  {QUALITIES.map((q) => (
-                    <AnswerButton
-                      key={q}
-                      label={QUALITY_SYMBOLS[q]}
-                      ariaLabel={q}
-                      selected={selectedQuality === q}
-                      disabled={feedback === 'correct'}
-                      onClick={() => {
-                        setSelectedQuality(q);
-                        setFeedback('idle');
-                      }}
-                    />
-                  ))}
+            <div id="answer-selection-panel" className="bg-white/90 backdrop-blur rounded-2xl border border-ink-200 shadow-xl p-4 sm:p-5 flex flex-col justify-between h-full">
+              <div className="space-y-3.5">
+                {/* Quality row */}
+                <div>
+                  <p className="text-sm font-bold tracking-wide text-ink-950 mb-2">Quality</p>
+                  <div className="flex flex-wrap gap-2">
+                    {QUALITIES.map((q) => (
+                      <AnswerButton
+                        key={q}
+                        label={QUALITY_SYMBOLS[q]}
+                        ariaLabel={q}
+                        selected={selectedQuality === q}
+                        disabled={feedback === 'correct'}
+                        onClick={() => {
+                          setSelectedQuality(q);
+                          setFeedback('idle');
+                        }}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              {/* Size row */}
-              <div>
-                <p className="text-sm font-bold tracking-wide text-ink-900 mb-2">Size</p>
-                <div className="flex flex-wrap gap-2">
-                  {SIZES.map((s) => (
-                    <AnswerButton
-                      key={s}
-                      label={SIZE_SYMBOLS[s]}
-                      ariaLabel={s}
-                      selected={selectedSize === s}
-                      disabled={feedback === 'correct'}
-                      onClick={() => {
-                        setSelectedSize(s);
-                        if (s === 'unison') setCompound(false);
-                        setFeedback('idle');
-                      }}
-                    />
-                  ))}
+                {/* Size row */}
+                <div>
+                  <p className="text-sm font-bold tracking-wide text-ink-950 mb-2">Size</p>
+                  <div className="flex flex-wrap gap-2">
+                    {SIZES.map((s) => (
+                      <AnswerButton
+                        key={s}
+                        label={SIZE_SYMBOLS[s]}
+                        ariaLabel={s}
+                        selected={selectedSize === s}
+                        disabled={feedback === 'correct'}
+                        onClick={() => {
+                          setSelectedSize(s);
+                          if (s === 'unison') setCompound(false);
+                          setFeedback('idle');
+                        }}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              {/* Compound toggle row */}
-              <div>
-                <p className="text-sm font-bold tracking-wide text-ink-900 mb-2">
-                  Compound <span className="text-xs text-ink-600 font-normal">(adds an octave)</span>
-                </p>
-                <button
-                  id="compound-toggle-button"
-                  onClick={() => {
-                    setCompound((c) => !c);
-                    setFeedback('idle');
-                  }}
-                  disabled={feedback === 'correct' || selectedSize === 'unison'}
-                  className={[
-                    'px-4 py-2 rounded-lg text-sm font-medium transition-all border',
+                {/* Compound toggle row */}
+                <div>
+                  <p className="text-sm font-bold tracking-wide text-ink-950 mb-2">
+                    Compound <span className="text-xs text-ink-600 font-semibold">(adds an octave)</span>
+                  </p>
+                  <button
+                    id="compound-toggle-button"
+                    onClick={() => {
+                      setCompound((c) => !c);
+                      setFeedback('idle');
+                    }}
+                    disabled={feedback === 'correct' || selectedSize === 'unison'}
+                    className={[
+                      'px-4 py-2 rounded-xl text-sm sm:text-base font-bold transition-all border shadow-xs',
+                      compound
+                        ? 'bg-sky-500 text-white border-sky-400 shadow-md shadow-sky-500/30 scale-105 font-extrabold'
+                        : 'bg-white text-ink-950 border-ink-300 hover:bg-ink-100 hover:border-ink-400',
+                      (feedback === 'correct' || selectedSize === 'unison') ? 'opacity-40 cursor-not-allowed' : '',
+                    ].join(' ')}
+                  >
                     compound
-                      ? 'bg-sky-500 text-white border-sky-400 shadow-md shadow-sky-500/30 scale-105 font-bold'
-                      : 'bg-white text-ink-700 border-ink-300 hover:bg-ink-100 hover:border-ink-400',
-                    (feedback === 'correct' || selectedSize === 'unison') ? 'opacity-40 cursor-not-allowed' : '',
-                  ].join(' ')}
-                >
-                  compound
-                </button>
+                  </button>
+                </div>
               </div>
 
-              {/* Select button */}
+              {/* Select button - slightly less height */}
               <div className="pt-2">
                 <button
                   id="submit-answer-button"
                   onClick={handleSelect}
                   disabled={!selectedQuality || !selectedSize || feedback === 'correct'}
-                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:from-ink-300 disabled:to-ink-300 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-base transition-all shadow-lg shadow-amber-500/20 disabled:shadow-none"
+                  className="w-full py-2.5 sm:py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:from-ink-300 disabled:to-ink-300 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-base transition-all shadow-lg shadow-amber-500/20 disabled:shadow-none"
                 >
                   {feedback === 'correct'
                     ? 'Correct! Next…'
                     : `Select${selectedSize ? ` — ${selectedQuality ? QUALITY_SYMBOLS[selectedQuality] : '?'} ${compound ? 'compound ' : ''}${SIZE_SYMBOLS[selectedSize]}` : ''}`}
                 </button>
+                {wrongAttempts > 0 && feedback !== 'correct' && (
+                  <p className="text-center text-xs sm:text-sm text-rose-600 font-semibold mt-1.5">
+                    Not quite — try again. ({wrongAttempts} {wrongAttempts === 1 ? 'attempt' : 'attempts'} so far)
+                  </p>
+                )}
               </div>
-
-              {wrongAttempts > 0 && feedback !== 'correct' && (
-                <p className="text-center text-sm text-rose-600">
-                  Not quite — try again. ({wrongAttempts} {wrongAttempts === 1 ? 'attempt' : 'attempts'} so far)
-                </p>
-              )}
             </div>
           </div>
         </main>
@@ -401,9 +409,14 @@ function StartScreen({ onStart, bestStreak }: { onStart: () => void; bestStreak:
   return (
     <div id="start-screen" className="w-full max-w-2xl animate-fade-in">
       <div id="start-screen-card" className="bg-white rounded-2xl shadow-xl border border-ink-200 p-6 sm:p-8">
-        <h2 className="text-2xl sm:text-3xl font-bold text-ink-900 mb-4 text-center">
-          Directions
-        </h2>
+        <div className="flex items-center gap-3 mb-4 text-left">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-sky-500/80 border border-sky-400/50 flex items-center justify-center shrink-0 shadow-xs backdrop-blur-xs text-white">
+            <Music2 className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-bold text-ink-900">
+            Directions
+          </h2>
+        </div>
         <p className="text-ink-700 text-lg sm:text-xl text-left leading-relaxed mb-6">
           Two consecutive notes appear on a treble or bass staff forming a melodic interval. Choose the interval's <strong>quality</strong> and <strong>size</strong>, toggle <strong>compound</strong> if it spans more than an octave, and then press <strong>Select</strong>. A bell means correct; a buzzer means try again.
         </p>
@@ -509,10 +522,10 @@ function AnswerButton({
       disabled={disabled}
       aria-label={ariaLabel}
       className={[
-        'px-4 py-2 rounded-lg text-sm font-medium transition-all border',
+        'px-5 py-2.5 rounded-xl text-base sm:text-lg font-bold transition-all border shadow-xs min-w-[44px]',
         selected
-          ? 'bg-sky-500 text-white border-sky-400 shadow-md shadow-sky-500/30 scale-105 font-bold'
-          : 'bg-white text-ink-700 border-ink-300 hover:bg-ink-100 hover:border-ink-400',
+          ? 'bg-sky-500 text-white border-sky-400 shadow-md shadow-sky-500/30 scale-105 font-extrabold'
+          : 'bg-white text-ink-950 border-ink-300 hover:bg-ink-100 hover:border-ink-400',
         disabled && !selected ? 'opacity-40 cursor-not-allowed' : '',
         className || '',
       ].join(' ')}
