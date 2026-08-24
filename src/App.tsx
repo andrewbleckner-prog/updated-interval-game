@@ -132,15 +132,15 @@ export default function App() {
         </header>
       ) : (
         <header id="game-header" className="w-full max-w-5xl mb-6 animate-fade-in text-left">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-orange-500/80 border border-orange-400/50 flex items-center justify-center shrink-0 shadow-xs backdrop-blur-xs text-white">
-              <Music2 className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-orange-500/80 border border-orange-400/50 flex items-center justify-center shrink-0 shadow-xs backdrop-blur-xs text-white">
+              <Music2 className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink-900 leading-tight">
+            <h1 className="text-3xl sm:text-4xl lg:text-[2.6rem] font-bold tracking-tight text-ink-900 leading-tight">
               Interval Identification
             </h1>
           </div>
-          <p className="mt-1.5 pl-11 sm:pl-12 text-ink-700 text-sm sm:text-base font-semibold">
+          <p className="mt-2 pl-13.5 sm:pl-14.5 text-ink-700 text-base sm:text-lg font-semibold">
             Identify the melodic interval between the two notes on the staff.
           </p>
         </header>
