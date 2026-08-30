@@ -125,24 +125,37 @@ export default function App() {
     <div id="interval-app-root" className="min-h-screen bg-stone-200/70 text-ink-800 flex flex-col items-center px-4 py-8 sm:py-12">
       {/* Header */}
       {!started ? (
-        <header id="game-header" className="w-full max-w-2xl text-center mb-8 animate-fade-in">
-          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-ink-900">
+        <header id="game-header" className="w-full max-w-2xl text-center mb-6 animate-fade-in">
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-ink-900">
             Interval Identification
           </h1>
         </header>
       ) : (
         <header id="game-header" className="w-full max-w-5xl mb-6 animate-fade-in text-left">
-          <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-orange-500/80 border border-orange-400/50 flex items-center justify-center shrink-0 shadow-xs backdrop-blur-xs text-white">
-              <Music2 className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+            {/* Title & subtitle aligned with left column */}
+            <div>
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-orange-500/80 border border-orange-400/50 flex items-center justify-center shrink-0 shadow-xs backdrop-blur-xs text-white">
+                  <Music2 className="w-5 h-5 text-white" />
+                </div>
+                <h1 className="text-2xl sm:text-3xl lg:text-[2.25rem] font-bold tracking-tight text-ink-900 leading-tight">
+                  Interval Identification
+                </h1>
+              </div>
+              <p className="mt-1.5 pl-12 sm:pl-13 text-ink-700 text-sm sm:text-base font-semibold">
+                Identify the melodic interval between the two notes on the staff.
+              </p>
             </div>
-            <h1 className="text-3xl sm:text-4xl lg:text-[2.6rem] font-bold tracking-tight text-ink-900 leading-tight">
-              Interval Identification
-            </h1>
+
+            {/* Stats row aligned right above the selection window spanning its exact width */}
+            <div id="game-stats-bar" className="grid grid-cols-4 gap-2 w-full">
+              <StatCard label="Score" value={score} accent="text-emerald-600" />
+              <StatCard label="Streak" value={streak} accent="text-amber-600" icon={<Trophy className="w-3 h-3" />} />
+              <StatCard label="Accuracy" value={`${accuracy}%`} accent="text-sky-600" />
+              <StatCard label="Best Streak" value={bestStreak} accent="text-violet-600" />
+            </div>
           </div>
-          <p className="mt-2 pl-13.5 sm:pl-14.5 text-ink-700 text-base sm:text-lg font-semibold">
-            Identify the melodic interval between the two notes on the staff.
-          </p>
         </header>
       )}
 
@@ -150,14 +163,6 @@ export default function App() {
         <StartScreen onStart={startGame} bestStreak={bestStreak} />
       ) : (
         <main id="game-main-board" className="w-full max-w-5xl flex flex-col gap-6 animate-fade-in">
-          {/* Stats bar */}
-          <div id="game-stats-bar" className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <StatCard label="Score" value={score} accent="text-emerald-600" />
-            <StatCard label="Streak" value={streak} accent="text-amber-600" icon={<Trophy className="w-4 h-4" />} />
-            <StatCard label="Accuracy" value={`${accuracy}%`} accent="text-sky-600" />
-            <StatCard label="Best Streak" value={bestStreak} accent="text-violet-600" />
-          </div>
-
           {/* Side-by-side: Staff window (left) and Selection window (right) */}
           <div id="game-workspace" className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
             {/* Left column: Staff card & action buttons */}
@@ -408,52 +413,52 @@ function StartScreen({ onStart, bestStreak }: { onStart: () => void; bestStreak:
 
   return (
     <div id="start-screen" className="w-full max-w-2xl animate-fade-in">
-      <div id="start-screen-card" className="bg-white rounded-2xl shadow-xl border border-ink-200 p-6 sm:p-8">
-        <div className="flex items-center gap-3 mb-4 text-left">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-sky-500/80 border border-sky-400/50 flex items-center justify-center shrink-0 shadow-xs backdrop-blur-xs text-white">
-            <Music2 className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+      <div id="start-screen-card" className="bg-white rounded-2xl shadow-xl border border-ink-200 p-5 sm:p-7">
+        <div className="flex items-center gap-2.5 mb-3 text-left">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-sky-500/80 border border-sky-400/50 flex items-center justify-center shrink-0 shadow-xs backdrop-blur-xs text-white">
+            <Music2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
           </div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-ink-900">
+          <h2 className="text-xl sm:text-2xl font-bold text-ink-900">
             Directions
           </h2>
         </div>
-        <p className="text-ink-700 text-lg sm:text-xl text-left leading-relaxed mb-6">
+        <p className="text-ink-700 text-sm sm:text-base text-left leading-relaxed mb-5">
           Two consecutive notes appear on a treble or bass staff forming a melodic interval. Choose the interval's <strong>quality</strong> and <strong>size</strong>, toggle <strong>compound</strong> if it spans more than an octave, and then press <strong>Select</strong>. A bell means correct; a buzzer means try again.
         </p>
 
         {/* Quality symbols display */}
-        <div id="quality-symbols-container" className="mb-6">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-ink-800 text-left mb-3">
+        <div id="quality-symbols-container" className="mb-5">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-ink-800 text-left mb-2.5">
             Interval Quality Symbols
           </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
             {qualitySymbols.map((item) => (
               <div
                 key={item.name}
                 id={`symbol-tile-${item.name.toLowerCase()}`}
-                className="bg-stone-50 border border-ink-200 rounded-xl p-3 sm:p-4 flex flex-col items-center justify-center text-center shadow-xs"
+                className="bg-stone-50 border border-ink-200 rounded-xl p-2.5 sm:p-3 flex flex-col items-center justify-center text-center shadow-xs"
               >
-                <span className="text-sm font-semibold text-ink-700 mb-1">{item.name}</span>
-                <span className="text-2xl sm:text-3xl font-bold text-ink-900 leading-none">{item.symbol}</span>
+                <span className="text-xs font-semibold text-ink-700 mb-0.5">{item.name}</span>
+                <span className="text-xl sm:text-2xl font-bold text-ink-900 leading-none">{item.symbol}</span>
               </div>
             ))}
           </div>
         </div>
 
         {/* Special Size symbols display */}
-        <div id="special-size-symbols-container" className="mb-8">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-ink-800 text-left mb-3">
+        <div id="special-size-symbols-container" className="mb-6">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-ink-800 text-left mb-2.5">
             Special Size Symbols
           </h3>
-          <div className="grid grid-cols-2 gap-3 max-w-md">
+          <div className="grid grid-cols-2 gap-2.5 max-w-sm">
             {specialSizeSymbols.map((item) => (
               <div
                 key={item.name}
                 id={`size-symbol-tile-${item.name.toLowerCase()}`}
-                className="bg-stone-50 border border-ink-200 rounded-xl p-3 sm:p-4 flex flex-col items-center justify-center text-center shadow-xs"
+                className="bg-stone-50 border border-ink-200 rounded-xl p-2.5 sm:p-3 flex flex-col items-center justify-center text-center shadow-xs"
               >
-                <span className="text-sm font-semibold text-ink-700 mb-1">{item.name}</span>
-                <span className="text-2xl sm:text-3xl font-bold text-ink-900 leading-none">{item.symbol}</span>
+                <span className="text-xs font-semibold text-ink-700 mb-0.5">{item.name}</span>
+                <span className="text-xl sm:text-2xl font-bold text-ink-900 leading-none">{item.symbol}</span>
               </div>
             ))}
           </div>
@@ -463,13 +468,13 @@ function StartScreen({ onStart, bestStreak }: { onStart: () => void; bestStreak:
           <button
             id="start-game-button"
             onClick={onStart}
-            className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold text-lg transition-all shadow-lg shadow-amber-500/30 w-full sm:w-auto"
+            className="inline-flex items-center justify-center gap-2 px-7 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold text-base transition-all shadow-lg shadow-amber-500/30 w-full sm:w-auto"
           >
-            <Play className="w-5 h-5" />
+            <Play className="w-4 h-4" />
             Start
           </button>
           {bestStreak > 0 && (
-            <p className="mt-4 text-sm text-ink-500 text-center">Best streak so far: {bestStreak}</p>
+            <p className="mt-3 text-xs text-ink-500 text-center">Best streak so far: {bestStreak}</p>
           )}
         </div>
       </div>
@@ -489,11 +494,11 @@ function StatCard({
   icon?: React.ReactNode;
 }) {
   return (
-    <div className="bg-white/80 backdrop-blur rounded-xl border border-ink-200 shadow-sm px-4 py-3 text-center">
-      <div className="text-xs uppercase tracking-wider text-ink-400">{label}</div>
-      <div className={`text-2xl font-bold mt-0.5 flex items-center justify-center gap-1 ${accent}`}>
+    <div className="bg-white/85 backdrop-blur rounded-xl border border-ink-200 shadow-xs px-2 py-2 text-center flex flex-col justify-center min-w-0">
+      <div className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-ink-500 truncate">{label}</div>
+      <div className={`text-base sm:text-lg font-bold mt-0.5 flex items-center justify-center gap-1 ${accent} truncate leading-tight`}>
         {icon}
-        {value}
+        <span>{value}</span>
       </div>
     </div>
   );
