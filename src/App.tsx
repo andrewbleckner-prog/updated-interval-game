@@ -124,13 +124,13 @@ export default function App() {
   return (
     <div id="interval-app-root" className="min-h-screen bg-stone-200/70 text-ink-800 flex flex-col items-center px-4 py-8 sm:py-12">
       {/* Header */}
-      {!started ? (
-        <header id="game-header" className="w-full max-w-2xl text-center mb-6 animate-fade-in">
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-ink-900">
-            Interval Identification
-          </h1>
-        </header>
-      ) : (
+{!started ? (
+  <header id="game-header" className="w-full max-w-2xl text-center mb-6 animate-fade-in">
+    <h1 className="game-title">
+      Interval Identification
+    </h1>
+  </header>
+) : (
         <header id="game-header" className="w-full max-w-5xl mb-6 animate-fade-in text-left">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
             {/* Title & subtitle aligned with left column */}
@@ -139,13 +139,13 @@ export default function App() {
                 <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-orange-500/80 border border-orange-400/50 flex items-center justify-center shrink-0 shadow-xs backdrop-blur-xs text-white">
                   <Music2 className="w-5 h-5 text-white" />
                 </div>
-                <h1 className="text-2xl sm:text-3xl lg:text-[2.25rem] font-bold tracking-tight text-ink-900 leading-tight">
-                  Interval Identification
-                </h1>
-              </div>
-              <p className="mt-1.5 pl-12 sm:pl-13 text-ink-700 text-sm sm:text-base font-semibold">
-                Identify the melodic interval between the two notes on the staff.
-              </p>
+<h1 className="game-title">
+  Interval Identification
+</h1>
+</div>
+<p className="game-subtitle mt-1.5 pl-12 sm:pl-13">
+  Identify the melodic interval between the two notes on the staff.
+</p>
             </div>
 
             {/* Stats row aligned right above the selection window spanning its exact width */}
