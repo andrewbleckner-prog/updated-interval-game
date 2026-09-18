@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { Check, X, Music2, Volume2, SkipForward, Trophy, Play, BookOpen } from 'lucide-react';
+import { Check, X, Music2, Volume2, SkipForward, Trophy, Play, BookOpen, Settings } from 'lucide-react';
 import { Staff } from '@/Staff';
 import { useAudio } from '@/useAudio';
 import {
@@ -7,8 +7,10 @@ import {
   type Quality,
   type SizeName,
   type Question,
+  type IntervalFamily,
   generateQuestion,
   intervalsEqual,
+  intervalMatchesFamily,
   noteName,
 } from '@/music';
 
@@ -34,10 +36,31 @@ const SIZE_SYMBOLS: Record<SizeName, string> = {
   octave: '8ve',
 };
 
+export interface FamilyOption {
+  id: IntervalFamily;
+  label: string;
+}
+
+export const INTERVAL_OPTIONS: FamilyOption[] = [
+  {
+    id: 'all',
+    label: 'All intervals',
+  },
+  {
+    id: 'perfect',
+    label: 'Intervals in the U, 4th, 5th and 8ve family',
+  },
+  {
+    id: 'imperfect',
+    label: 'Intervals in the 2nd, 3rd, 6th and 7th family',
+  },
+];
+
 type Feedback = 'idle' | 'correct' | 'wrong';
 
 export default function App() {
   const audio = useAudio();
+  const [intervalFamily, setIntervalFamily] = useState<IntervalFamily>('all');
   const [question, setQuestion] = useState<Question>(() => generateQuestion());
   const [selectedQuality, setSelectedQuality] = useState<Quality | null>(null);
   const [selectedSize, setSelectedSize] = useState<SizeName | null>(null);
@@ -50,11 +73,12 @@ export default function App() {
   const [wrongAttempts, setWrongAttempts] = useState(0); // wrong attempts on current question
   const [started, setStarted] = useState(false);
   const [showTheoryTips, setShowTheoryTips] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const questionKey = useRef(0);
 
   const nextQuestion = useCallback(
-    (prev?: Question) => {
-      const q = generateQuestion(prev);
+    (prev?: Question, family: IntervalFamily = intervalFamily) => {
+      const q = generateQuestion(prev, family);
       setQuestion(q);
       setSelectedQuality(null);
       setSelectedSize(null);
@@ -65,7 +89,17 @@ export default function App() {
       // Play the new interval after a short delay.
       window.setTimeout(() => audio.playNotes([q.low, q.high]), 250);
     },
-    [audio],
+    [audio, intervalFamily],
+  );
+
+  const handleFamilyChange = useCallback(
+    (newFamily: IntervalFamily) => {
+      setIntervalFamily(newFamily);
+      if (started && !intervalMatchesFamily(question.interval, newFamily)) {
+        nextQuestion(undefined, newFamily);
+      }
+    },
+    [started, question, nextQuestion],
   );
 
   const handleSelect = useCallback(() => {
@@ -108,7 +142,7 @@ export default function App() {
     setAttempts(0);
     setStreak(0);
     setBestStreak(0);
-    const q = generateQuestion();
+    const q = generateQuestion(undefined, intervalFamily);
     setQuestion(q);
     setSelectedQuality(null);
     setSelectedSize(null);
@@ -117,7 +151,7 @@ export default function App() {
     setWrongAttempts(0);
     audio.getCtx(); // unlock audio on user gesture
     window.setTimeout(() => audio.playNotes([q.low, q.high]), 150);
-  }, [audio]);
+  }, [audio, intervalFamily]);
 
   const accuracy = attempts > 0 ? Math.round((score / attempts) * 100) : 0;
 
@@ -160,7 +194,12 @@ export default function App() {
       )}
 
       {!started ? (
-        <StartScreen onStart={startGame} bestStreak={bestStreak} />
+        <StartScreen
+          onStart={startGame}
+          bestStreak={bestStreak}
+          selectedFamily={intervalFamily}
+          onSelectFamily={handleFamilyChange}
+        />
       ) : (
         <main id="game-main-board" className="w-full max-w-5xl flex flex-col gap-6 animate-fade-in">
           {/* Side-by-side: Staff window (left) and Selection window (right) */}
@@ -213,25 +252,34 @@ export default function App() {
                 Play Interval
               </button>
 
-              {/* Action buttons directly under staff window */}
-              <div className="grid grid-cols-2 gap-3 w-full">
+              {/* Action buttons directly under staff window: Theory Tips, Settings, Skip */}
+              <div className="grid grid-cols-3 gap-2 sm:gap-3 w-full">
                 <button
                   id="theory-tips-button"
                   onClick={() => setShowTheoryTips(true)}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-white hover:bg-ink-100 text-ink-950 text-sm font-bold transition-colors border border-ink-300 shadow-sm w-full"
+                  className="inline-flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2.5 rounded-full bg-white hover:bg-ink-100 text-ink-950 text-xs sm:text-sm font-bold transition-colors border border-ink-300 shadow-sm w-full whitespace-nowrap"
                 >
-                  <BookOpen className="w-4 h-4 text-amber-600" />
-                  Theory Tips
+                  <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600 shrink-0" />
+                  <span>Theory Tips</span>
+                </button>
+
+                <button
+                  id="settings-button"
+                  onClick={() => setShowSettings(true)}
+                  className="inline-flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2.5 rounded-full bg-white hover:bg-ink-100 text-ink-950 text-xs sm:text-sm font-bold transition-colors border border-ink-300 shadow-sm w-full whitespace-nowrap"
+                >
+                  <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-600 shrink-0" />
+                  <span>Settings</span>
                 </button>
 
                 <button
                   id="skip-question-button"
                   onClick={handleSkip}
                   disabled={feedback === 'correct'}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-white hover:bg-ink-100 disabled:opacity-40 disabled:cursor-not-allowed text-ink-950 text-sm font-bold transition-colors border border-ink-300 shadow-sm w-full"
+                  className="inline-flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2.5 rounded-full bg-white hover:bg-ink-100 disabled:opacity-40 disabled:cursor-not-allowed text-ink-950 text-xs sm:text-sm font-bold transition-colors border border-ink-300 shadow-sm w-full whitespace-nowrap"
                 >
-                  <SkipForward className="w-4 h-4 text-ink-800" />
-                  Skip
+                  <SkipForward className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-ink-800 shrink-0" />
+                  <span>Skip</span>
                 </button>
               </div>
             </div>
@@ -390,6 +438,60 @@ export default function App() {
         </div>
       )}
 
+      {/* Settings Pop-up Modal */}
+      {showSettings && (
+        <div
+          id="settings-modal-overlay"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-950/60 backdrop-blur-xs animate-fade-in"
+          onClick={() => setShowSettings(false)}
+        >
+          <div
+            id="settings-popup-window"
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-ink-200 p-6 sm:p-8 relative animate-fade-in"
+          >
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div className="inline-flex items-center gap-2 text-sky-600">
+                <Settings className="w-5 h-5" />
+                <span className="text-xs font-semibold uppercase tracking-wider text-ink-500">Game Settings</span>
+              </div>
+              <button
+                id="close-settings-button"
+                onClick={() => setShowSettings(false)}
+                className="text-ink-400 hover:text-ink-700 p-1.5 rounded-lg hover:bg-ink-100 transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <h3 className="text-xl sm:text-2xl font-bold text-ink-900 mb-2">
+              Game Options
+            </h3>
+            <p className="text-ink-600 text-sm mb-5">
+              Choose which intervals you want to practice:
+            </p>
+
+            <div className="mb-6">
+              <IntervalOptionButtons
+                selectedFamily={intervalFamily}
+                onSelectFamily={handleFamilyChange}
+              />
+            </div>
+
+            <div className="flex justify-end pt-3 border-t border-ink-100">
+              <button
+                id="dismiss-settings-button"
+                onClick={() => setShowSettings(false)}
+                className="px-6 py-2.5 rounded-xl bg-ink-900 hover:bg-ink-800 text-white font-medium text-sm transition-colors shadow-sm"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <footer className="mt-10 text-center text-xs text-ink-400">
         Notation rendered with the Bravura music font (SMuFL). Sounds synthesized live.
       </footer>
@@ -397,7 +499,51 @@ export default function App() {
   );
 }
 
-function StartScreen({ onStart, bestStreak }: { onStart: () => void; bestStreak: number }) {
+function IntervalOptionButtons({
+  selectedFamily,
+  onSelectFamily,
+}: {
+  selectedFamily: IntervalFamily;
+  onSelectFamily: (family: IntervalFamily) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2.5 w-full">
+      {INTERVAL_OPTIONS.map((opt) => {
+        const isSelected = selectedFamily === opt.id;
+        return (
+          <button
+            key={opt.id}
+            type="button"
+            id={`option-button-${opt.id}`}
+            onClick={() => onSelectFamily(opt.id)}
+            className={[
+              'w-full text-left px-4 py-3 rounded-xl border transition-all shadow-xs',
+              isSelected
+                ? 'bg-sky-50 border-sky-400 ring-2 ring-sky-300 text-sky-950 font-bold'
+                : 'bg-stone-50 hover:bg-stone-100/90 border-ink-200 text-ink-900 hover:border-ink-300 font-bold',
+            ].join(' ')}
+          >
+            <span className="text-sm sm:text-base font-bold leading-snug">
+              {opt.label}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function StartScreen({
+  onStart,
+  bestStreak,
+  selectedFamily,
+  onSelectFamily,
+}: {
+  onStart: () => void;
+  bestStreak: number;
+  selectedFamily: IntervalFamily;
+  onSelectFamily: (family: IntervalFamily) => void;
+}) {
   const qualitySymbols = [
     { name: 'Perfect', symbol: 'P' },
     { name: 'Major', symbol: 'M' },
@@ -462,6 +608,17 @@ function StartScreen({ onStart, bestStreak }: { onStart: () => void; bestStreak:
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Game Options Section */}
+        <div id="game-options-container" className="mb-6">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-ink-800 text-left mb-2.5">
+            Game Options
+          </h3>
+          <IntervalOptionButtons
+            selectedFamily={selectedFamily}
+            onSelectFamily={onSelectFamily}
+          />
         </div>
 
         <div className="flex flex-col items-center">

@@ -12,6 +12,7 @@ export type SizeName =
   | 'seventh'
   | 'octave';
 export type Clef = 'treble' | 'bass';
+export type IntervalFamily = 'all' | 'perfect' | 'imperfect';
 
 export interface Note {
   // Diatonic letter index: 0=C, 1=D, 2=E, 3=F, 4=G, 5=A, 6=B
@@ -253,8 +254,25 @@ export interface Question {
   clef: Clef;
 }
 
+export const PERFECT_FAMILY_SIZES: readonly SizeName[] = ['unison', 'fourth', 'fifth', 'octave'];
+export const IMPERFECT_FAMILY_SIZES: readonly SizeName[] = ['second', 'third', 'sixth', 'seventh'];
+
+export function intervalMatchesFamily(interval: Interval, family: IntervalFamily): boolean {
+  if (family === 'all') return true;
+  if (family === 'perfect') return PERFECT_FAMILY_SIZES.includes(interval.size);
+  if (family === 'imperfect') return IMPERFECT_FAMILY_SIZES.includes(interval.size);
+  return true;
+}
+
 /** Generate a random valid interval + note pair, continuously alternating between treble and bass clef. */
-export function generateQuestion(previous?: Question): Question {
+export function generateQuestion(previous?: Question, family: IntervalFamily = 'all'): Question {
+  const allowedSizes: readonly SizeName[] =
+    family === 'perfect'
+      ? PERFECT_FAMILY_SIZES
+      : family === 'imperfect'
+      ? IMPERFECT_FAMILY_SIZES
+      : ALL_SIZES;
+
   let interval: Interval;
   let attempts = 0;
   // Continuously alternates clefs: treble -> bass -> treble -> bass...
@@ -262,7 +280,7 @@ export function generateQuestion(previous?: Question): Question {
 
   do {
     const quality = ALL_QUALITIES[Math.floor(Math.random() * ALL_QUALITIES.length)];
-    const size = ALL_SIZES[Math.floor(Math.random() * ALL_SIZES.length)];
+    const size = allowedSizes[Math.floor(Math.random() * allowedSizes.length)];
     const compound = Math.random() < 0.30; // 30% chance of compound
     interval = { quality, size, compound };
     if (!isValidCombo(quality, size, compound)) continue;
@@ -270,7 +288,7 @@ export function generateQuestion(previous?: Question): Question {
   } while (
     (!isValidCombo(interval.quality, interval.size, interval.compound) ||
       (previous && intervalsEqual(interval, previous.interval))) &&
-    attempts < 30
+    attempts < 40
   );
 
   const { low, high } = notesForInterval(interval, clef);
