@@ -1,5 +1,5 @@
-import React, { useCallback, useRef, useState } from 'react';
-import { Check, X, Music2, Volume2, SkipForward, Trophy, Play, BookOpen, Settings } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Check, X, Music2, Volume2, Trophy, Play, Lightbulb, Settings, Eye, SlidersHorizontal } from 'lucide-react';
 import { Staff } from '@/Staff';
 import { useAudio } from '@/useAudio';
 import {
@@ -11,7 +11,9 @@ import {
   generateQuestion,
   intervalsEqual,
   intervalMatchesFamily,
-  noteName,
+  LETTER_NAMES,
+  ACC_SYMBOL,
+  type Note,
 } from '@/music';
 
 const QUALITIES: Quality[] = ['perfect', 'minor', 'major', 'diminished', 'augmented'];
@@ -22,9 +24,28 @@ const QUALITY_SYMBOLS: Record<Quality, string> = {
   diminished: 'º',
   augmented: '+',
 };
-const SIZES: SizeName[] = [
-  'unison', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'octave',
-];
+const QUALITY_WORDS: Record<Quality, string> = {
+  perfect: 'Perfect',
+  major: 'Major',
+  minor: 'Minor',
+  diminished: 'Diminished',
+  augmented: 'Augmented',
+};
+// Keyboard keys for each quality ("M" is Shift + m).
+const QUALITY_KEYS: Record<string, Quality> = {
+  p: 'perfect',
+  P: 'perfect',
+  M: 'major',
+  m: 'minor',
+  d: 'diminished',
+  D: 'diminished',
+  o: 'diminished',
+  a: 'augmented',
+  A: 'augmented',
+  '+': 'augmented',
+};
+
+const SIZES: SizeName[] = ['unison', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'octave'];
 const SIZE_SYMBOLS: Record<SizeName, string> = {
   unison: 'U',
   second: '2nd',
@@ -35,6 +56,16 @@ const SIZE_SYMBOLS: Record<SizeName, string> = {
   seventh: '7th',
   octave: '8ve',
 };
+const SIZE_WORDS: Record<SizeName, string> = {
+  unison: 'unison',
+  second: '2nd',
+  third: '3rd',
+  fourth: '4th',
+  fifth: '5th',
+  sixth: '6th',
+  seventh: '7th',
+  octave: 'octave',
+};
 
 export interface FamilyOption {
   id: IntervalFamily;
@@ -42,21 +73,33 @@ export interface FamilyOption {
 }
 
 export const INTERVAL_OPTIONS: FamilyOption[] = [
-  {
-    id: 'all',
-    label: 'All intervals',
-  },
-  {
-    id: 'perfect',
-    label: 'Intervals in the U, 4th, 5th and 8ve family',
-  },
-  {
-    id: 'imperfect',
-    label: 'Intervals in the 2nd, 3rd, 6th and 7th family',
-  },
+  { id: 'all', label: 'All intervals' },
+  { id: 'perfect', label: 'Intervals in the U, 4th, 5th and 8ve family' },
+  { id: 'imperfect', label: 'Intervals in the 2nd, 3rd, 6th and 7th family' },
 ];
 
-type Feedback = 'idle' | 'correct' | 'wrong';
+// "revealed" = the student pressed Show answer for this interval.
+type Feedback = 'idle' | 'correct' | 'wrong' | 'revealed';
+
+function intervalName(i: Interval): string {
+  return `${i.compound ? 'compound ' : ''}${QUALITY_WORDS[i.quality].toLowerCase()} ${SIZE_WORDS[i.size]}`;
+}
+
+// Short label for the Check button, e.g. "M3", "P5 compound", "+4".
+const SIZE_NUMBERS: Record<SizeName, string> = {
+  unison: 'U',
+  second: '2',
+  third: '3',
+  fourth: '4',
+  fifth: '5',
+  sixth: '6',
+  seventh: '7',
+  octave: '8',
+};
+
+function noteText(n: Note): string {
+  return `${LETTER_NAMES[n.letter]}${n.accidental === 'natural' ? '' : ACC_SYMBOL[n.accidental]}${n.octave}`;
+}
 
 export default function App() {
   const audio = useAudio();
@@ -70,26 +113,41 @@ export default function App() {
   const [attempts, setAttempts] = useState(0);
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
-  const [wrongAttempts, setWrongAttempts] = useState(0); // wrong attempts on current question
+  const [wrongAttempts, setWrongAttempts] = useState(0);
   const [started, setStarted] = useState(false);
-  const [showTheoryTips, setShowTheoryTips] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const questionKey = useRef(0);
+  const [dialog, setDialog] = useState<'tips' | 'settings' | null>(null);
+  const timer = useRef<number | null>(null);
+  const wrongTimer = useRef<number | null>(null);
+
+  // Once answered correctly or the answer is shown, the buttons lock until
+  // the student moves on to the next interval.
+  const locked = feedback === 'correct' || feedback === 'revealed';
+
+  const clearAnswer = useCallback(() => {
+    if (wrongTimer.current) window.clearTimeout(wrongTimer.current);
+    setSelectedQuality(null);
+    setSelectedSize(null);
+    setCompound(false);
+    setFeedback('idle');
+    setWrongAttempts(0);
+  }, []);
+
+  const playSoon = useCallback(
+    (q: Question, delay = 250) => {
+      if (timer.current) window.clearTimeout(timer.current);
+      timer.current = window.setTimeout(() => audio.playNotes([q.low, q.high]), delay);
+    },
+    [audio],
+  );
 
   const nextQuestion = useCallback(
     (prev?: Question, family: IntervalFamily = intervalFamily) => {
       const q = generateQuestion(prev, family);
       setQuestion(q);
-      setSelectedQuality(null);
-      setSelectedSize(null);
-      setCompound(false);
-      setFeedback('idle');
-      setWrongAttempts(0);
-      questionKey.current += 1;
-      // Play the new interval after a short delay.
-      window.setTimeout(() => audio.playNotes([q.low, q.high]), 250);
+      clearAnswer();
+      playSoon(q);
     },
-    [audio, intervalFamily],
+    [intervalFamily, clearAnswer, playSoon],
   );
 
   const handleFamilyChange = useCallback(
@@ -102,12 +160,32 @@ export default function App() {
     [started, question, nextQuestion],
   );
 
-  const handleSelect = useCallback(() => {
-    if (!selectedQuality || !selectedSize || feedback === 'correct') return;
+  const pickQuality = useCallback((q: Quality) => {
+    setSelectedQuality(q);
+    setFeedback((f) => (f === 'wrong' ? 'idle' : f));
+  }, []);
+
+  const pickSize = useCallback((s: SizeName) => {
+    setSelectedSize(s);
+    if (s === 'unison') setCompound(false);
+    setFeedback((f) => (f === 'wrong' ? 'idle' : f));
+  }, []);
+
+  const toggleCompound = useCallback(() => {
+    if (selectedSize === 'unison') return;
+    setCompound((c) => !c);
+    setFeedback((f) => (f === 'wrong' ? 'idle' : f));
+  }, [selectedSize]);
+
+  const handleCheck = useCallback(() => {
+    if (locked) {
+      nextQuestion(question);
+      return;
+    }
+    if (!selectedQuality || !selectedSize) return;
 
     const userAnswer: Interval = { quality: selectedQuality, size: selectedSize, compound };
     const correct = intervalsEqual(userAnswer, question.interval);
-
     setAttempts((a) => a + 1);
 
     if (correct) {
@@ -117,24 +195,33 @@ export default function App() {
       setStreak(newStreak);
       if (newStreak > bestStreak) setBestStreak(newStreak);
       audio.playCorrect();
-      window.setTimeout(() => nextQuestion(question), 1700);
+      // Wait for the student to press "Next Interval".
     } else {
       setFeedback('wrong');
       setWrongAttempts((w) => w + 1);
       setStreak(0);
       audio.playWrong();
-      // Clear feedback after a moment so they can try again.
-      window.setTimeout(() => setFeedback('idle'), 1100);
+      if (wrongTimer.current) window.clearTimeout(wrongTimer.current);
+      wrongTimer.current = window.setTimeout(() => setFeedback((f) => (f === 'wrong' ? 'idle' : f)), 1100);
     }
-  }, [selectedQuality, selectedSize, compound, feedback, question, audio, streak, bestStreak, nextQuestion]);
+  }, [locked, selectedQuality, selectedSize, compound, question, audio, streak, bestStreak, nextQuestion]);
+
+  // Show the correct interval (counts as a miss) so the student can learn from it.
+  const handleShowAnswer = useCallback(() => {
+    if (locked) return;
+    if (wrongTimer.current) window.clearTimeout(wrongTimer.current);
+    if (wrongAttempts === 0) setAttempts((a) => a + 1);
+    setStreak(0);
+    setSelectedQuality(question.interval.quality);
+    setSelectedSize(question.interval.size);
+    setCompound(question.interval.compound);
+    setFeedback('revealed');
+    audio.playNotes([question.low, question.high]);
+  }, [locked, wrongAttempts, question, audio]);
 
   const handlePlayInterval = useCallback(() => {
     audio.playNotes([question.low, question.high]);
   }, [audio, question]);
-
-  const handleSkip = useCallback(() => {
-    nextQuestion(question);
-  }, [nextQuestion, question]);
 
   const startGame = useCallback(() => {
     setStarted(true);
@@ -144,54 +231,106 @@ export default function App() {
     setBestStreak(0);
     const q = generateQuestion(undefined, intervalFamily);
     setQuestion(q);
-    setSelectedQuality(null);
-    setSelectedSize(null);
-    setCompound(false);
-    setFeedback('idle');
-    setWrongAttempts(0);
+    clearAnswer();
     audio.getCtx(); // unlock audio on user gesture
-    window.setTimeout(() => audio.playNotes([q.low, q.high]), 150);
-  }, [audio, intervalFamily]);
+    playSoon(q, 150);
+  }, [audio, intervalFamily, clearAnswer, playSoon]);
+
+  // Keyboard on computers: P M m d a choose the quality, 1–8 the size
+  // (1 = unison, 8 = octave), C toggles compound, Enter checks, Space replays.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (dialog) {
+        if (e.key === 'Escape') setDialog(null);
+        return;
+      }
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+      const key = e.key;
+
+      if (!started) {
+        if (key === 'Enter') {
+          e.preventDefault();
+          startGame();
+        }
+        return;
+      }
+      if (key === 'Enter') {
+        e.preventDefault();
+        handleCheck();
+        return;
+      }
+      if (key === ' ') {
+        if (target?.tagName === 'BUTTON') return;
+        e.preventDefault();
+        handlePlayInterval();
+        return;
+      }
+      if (locked) return;
+      if (key === 'Backspace' || key === 'Escape') {
+        e.preventDefault();
+        clearAnswer();
+        return;
+      }
+      if (key === 'c' || key === 'C') {
+        toggleCompound();
+        return;
+      }
+      if (QUALITY_KEYS[key]) {
+        pickQuality(QUALITY_KEYS[key]);
+        return;
+      }
+      if (/^[1-8]$/.test(key)) {
+        pickSize(SIZES[Number(key) - 1]);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [dialog, started, locked, startGame, handleCheck, handlePlayInterval, clearAnswer, toggleCompound, pickQuality, pickSize]);
 
   const accuracy = attempts > 0 ? Math.round((score / attempts) * 100) : 0;
+  const familyLabel = INTERVAL_OPTIONS.find((o) => o.id === intervalFamily)?.label;
+
+  const preview = selectedSize
+    ? `${selectedQuality ? QUALITY_SYMBOLS[selectedQuality] : '?'}${SIZE_NUMBERS[selectedSize]}${compound ? ' compound' : ''}`
+    : '';
+
+  const toolButton =
+    'inline-flex items-center justify-center gap-1.5 px-2 sm:px-3 h-11 rounded-xl bg-white hover:bg-stone-50 text-stone-800 text-sm font-semibold transition-all border border-stone-300 shadow-sm hover:border-stone-400 cursor-pointer w-full text-center whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed';
 
   return (
-    <div id="interval-app-root" className="min-h-screen bg-stone-200/70 text-ink-800 flex flex-col items-center px-4 py-8 sm:py-12">
-      {/* Header */}
-{!started ? (
-  <header id="game-header" className="w-full max-w-2xl text-center mb-6 animate-fade-in">
-    <h1 className="game-title">
-      Interval Identification
-    </h1>
-  </header>
-) : (
-        <header id="game-header" className="w-full max-w-5xl mb-6 animate-fade-in text-left">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
-            {/* Title & subtitle aligned with left column */}
-            <div>
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-orange-500/80 border border-orange-400/50 flex items-center justify-center shrink-0 shadow-xs backdrop-blur-xs text-white">
-                  <Music2 className="w-5 h-5 text-white" />
-                </div>
-<h1 className="game-title">
-  Interval Identification
-</h1>
-</div>
-<p className="game-subtitle mt-1.5 pl-12 sm:pl-13">
-  Identify the melodic interval between the two notes on the staff.
-</p>
+    <div id="interval-app-root" className="min-h-screen bg-stone-100 text-stone-900 flex flex-col items-center px-4 py-4 sm:py-10">
+      <header
+        id="game-header"
+        className={`w-full ${
+          started ? 'max-w-5xl mb-3 md:mb-4' : 'max-w-3xl text-center mb-6 sm:mb-8 flex flex-col items-center justify-center'
+        } animate-fade-in`}
+      >
+        {started ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 items-center">
+            <div className="flex items-center gap-2.5 justify-start min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-stone-900 flex items-center justify-center text-white shadow-sm shrink-0">
+                <Music2 className="w-4 h-4" />
+              </div>
+              <h1 className="game-title">Interval Identification</h1>
             </div>
-
-            {/* Stats row aligned right above the selection window spanning its exact width */}
-            <div id="game-stats-bar" className="grid grid-cols-4 gap-2 w-full">
-              <StatCard label="Score" value={score} accent="text-emerald-600" />
-              <StatCard label="Streak" value={streak} accent="text-amber-600" icon={<Trophy className="w-3 h-3" />} />
-              <StatCard label="Accuracy" value={`${accuracy}%`} accent="text-sky-600" />
-              <StatCard label="Best Streak" value={bestStreak} accent="text-violet-600" />
+            <div id="game-stats-bar" className="grid grid-cols-4 gap-1.5 sm:gap-2 w-full">
+              <StatChip label="Score" value={score} accent="text-emerald-700" />
+              <StatChip
+                label="Streak"
+                value={streak}
+                accent="text-amber-700"
+                icon={<Trophy className="w-3 h-3 text-amber-600 inline" />}
+              />
+              <StatChip label="Accuracy" value={`${accuracy}%`} accent="text-sky-700" />
+              <StatChip label="Best" value={bestStreak} accent="text-violet-700" />
             </div>
           </div>
-        </header>
-      )}
+        ) : (
+          <h1 className="game-title">Interval Identification</h1>
+        )}
+      </header>
 
       {!started ? (
         <StartScreen
@@ -201,301 +340,254 @@ export default function App() {
           onSelectFamily={handleFamilyChange}
         />
       ) : (
-        <main id="game-main-board" className="w-full max-w-5xl flex flex-col gap-6 animate-fade-in">
-          {/* Side-by-side: Staff window (left) and Selection window (right) */}
-          <div id="game-workspace" className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
-            {/* Left column: Staff card & action buttons */}
-            <div id="staff-column" className="flex flex-col justify-between h-full gap-3">
-              {/* Staff card */}
-              <div id="staff-card" className="bg-white rounded-2xl shadow-xl border border-ink-200 p-4 sm:p-5 relative overflow-hidden flex flex-col items-center flex-1 justify-center">
-                <div className="absolute inset-0 bg-gradient-to-br from-white to-ink-50 opacity-50 pointer-events-none" />
-                <div className="relative w-full flex flex-col items-center">
-                  <Staff low={question.low} high={question.high} clef={question.clef} />
-                  <div className="mt-2 flex items-center justify-center gap-4 text-ink-900 font-bold">
-                    <span className="text-sm">{noteName(question.low)}</span>
-                    <span className="text-ink-400">→</span>
-                    <span className="text-sm">{noteName(question.high)}</span>
+        <main id="game-main-board" className="w-full max-w-5xl flex flex-col gap-3 animate-fade-in">
+          <div id="game-workspace" className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 items-stretch">
+            {/* 1. Staff */}
+            <div
+              id="staff-card"
+              className="bg-white rounded-2xl shadow-sm border border-stone-200 p-3 sm:p-4 flex flex-col items-center h-full relative"
+            >
+              <div className="w-full flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-stone-600">
+                    Name this interval
                   </div>
-
-                  {/* Feedback state indicator */}
-                  <div className="mt-2 min-h-[34px] flex items-center justify-center">
-                    {feedback === 'correct' && (
-                      <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-900 font-bold text-sm animate-pop-in shadow-xs">
-                        <Check className="w-5 h-5 text-emerald-700" strokeWidth={3} />
-                        <span>Correct!</span>
-                      </div>
-                    )}
-                    {feedback === 'wrong' && (
-                      <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-rose-100 border border-rose-300 text-rose-900 font-bold text-sm animate-shake shadow-xs">
-                        <X className="w-5 h-5 text-rose-700" strokeWidth={3} />
-                        <span>Try again</span>
-                      </div>
-                    )}
-                    {feedback === 'idle' && (
-                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-ink-100 text-ink-700 font-semibold text-xs">
-                        <Music2 className="w-4 h-4 text-ink-600" />
-                        <span>Identify melodic interval</span>
-                      </div>
-                    )}
-                  </div>
+                  {intervalFamily !== 'all' && (
+                    <div className="mt-1 inline-block px-2.5 py-1 rounded-md bg-stone-100 border border-stone-200 text-xs font-semibold text-stone-700">
+                      {familyLabel}
+                    </div>
+                  )}
                 </div>
+                <button
+                  id="replay-interval-button"
+                  onClick={handlePlayInterval}
+                  title="Play the interval (Space)"
+                  aria-label="Play the interval"
+                  className="w-11 h-11 shrink-0 rounded-xl bg-stone-100 hover:bg-stone-200 active:bg-stone-300 text-stone-800 border border-stone-200 flex items-center justify-center transition-all cursor-pointer"
+                >
+                  <Volume2 className="w-5 h-5" />
+                </button>
               </div>
 
-              {/* Replay interval button - slightly greater height */}
-              <button
-                id="replay-interval-button"
-                onClick={handlePlayInterval}
-                disabled={feedback === 'correct'}
-                className="inline-flex items-center justify-center gap-2 px-5 py-3 sm:py-3.5 rounded-xl bg-white hover:bg-ink-100 disabled:opacity-40 disabled:cursor-not-allowed text-ink-950 text-sm sm:text-base font-bold transition-colors border border-ink-300 shadow-sm w-full"
-              >
-                <Volume2 className="w-4 h-4 text-ink-800" />
-                Play Interval
-              </button>
+              <div className="w-full flex flex-col items-center justify-center flex-1 py-2">
+                <Staff low={question.low} high={question.high} clef={question.clef} />
+              </div>
 
-              {/* Action buttons directly under staff window: Theory Tips, Settings, Skip */}
-              <div className="grid grid-cols-3 gap-2 sm:gap-3 w-full">
-                <button
-                  id="theory-tips-button"
-                  onClick={() => setShowTheoryTips(true)}
-                  className="inline-flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2.5 rounded-full bg-white hover:bg-ink-100 text-ink-950 text-xs sm:text-sm font-bold transition-colors border border-ink-300 shadow-sm w-full whitespace-nowrap"
-                >
-                  <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600 shrink-0" />
-                  <span>Theory Tips</span>
-                </button>
+              {/* Note names appear once the interval is answered or shown */}
+              <div className="min-h-[24px] flex items-center justify-center gap-3 text-stone-900 font-bold">
+                {locked && (
+                  <>
+                    <span>{noteText(question.low)}</span>
+                    <span className="text-stone-400">→</span>
+                    <span>{noteText(question.high)}</span>
+                  </>
+                )}
+              </div>
 
-                <button
-                  id="settings-button"
-                  onClick={() => setShowSettings(true)}
-                  className="inline-flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2.5 rounded-full bg-white hover:bg-ink-100 text-ink-950 text-xs sm:text-sm font-bold transition-colors border border-ink-300 shadow-sm w-full whitespace-nowrap"
-                >
-                  <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-600 shrink-0" />
-                  <span>Settings</span>
-                </button>
-
-                <button
-                  id="skip-question-button"
-                  onClick={handleSkip}
-                  disabled={feedback === 'correct'}
-                  className="inline-flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2.5 rounded-full bg-white hover:bg-ink-100 disabled:opacity-40 disabled:cursor-not-allowed text-ink-950 text-xs sm:text-sm font-bold transition-colors border border-ink-300 shadow-sm w-full whitespace-nowrap"
-                >
-                  <SkipForward className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-ink-800 shrink-0" />
-                  <span>Skip</span>
-                </button>
+              <div className="w-full flex items-center justify-center min-h-[40px]">
+                <FeedbackChip feedback={feedback} answer={intervalName(question.interval)} />
               </div>
             </div>
 
-            {/* Right column: Answer selection window */}
-            <div id="answer-selection-panel" className="bg-white/90 backdrop-blur rounded-2xl border border-ink-200 shadow-xl p-4 sm:p-5 flex flex-col justify-between h-full">
-              <div className="space-y-3.5">
-                {/* Quality row */}
+            {/* 2. Answer */}
+            <div className="flex flex-col justify-between h-full gap-2">
+              <div
+                id="answer-selection-panel"
+                className="bg-white rounded-2xl border border-stone-200 shadow-sm p-4 sm:p-5 flex flex-col justify-center flex-1 gap-4 md:gap-5"
+              >
                 <div>
-                  <p className="text-sm font-bold tracking-wide text-ink-950 mb-2">Quality</p>
-                  <div className="flex flex-wrap gap-2">
+                  <p className="game-label mb-1.5">Quality</p>
+                  <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
                     {QUALITIES.map((q) => (
                       <AnswerButton
                         key={q}
-                        label={QUALITY_SYMBOLS[q]}
+                        label={<span className="text-lg">{QUALITY_SYMBOLS[q]}</span>}
                         ariaLabel={q}
+                        title={QUALITY_WORDS[q]}
                         selected={selectedQuality === q}
-                        disabled={feedback === 'correct'}
-                        onClick={() => {
-                          setSelectedQuality(q);
-                          setFeedback('idle');
-                        }}
+                        disabled={locked}
+                        onClick={() => pickQuality(q)}
                       />
                     ))}
                   </div>
                 </div>
 
-                {/* Size row */}
                 <div>
-                  <p className="text-sm font-bold tracking-wide text-ink-950 mb-2">Size</p>
-                  <div className="flex flex-wrap gap-2">
+                  <p className="game-label mb-1.5">Size</p>
+                  <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
                     {SIZES.map((s) => (
                       <AnswerButton
                         key={s}
                         label={SIZE_SYMBOLS[s]}
                         ariaLabel={s}
                         selected={selectedSize === s}
-                        disabled={feedback === 'correct'}
-                        onClick={() => {
-                          setSelectedSize(s);
-                          if (s === 'unison') setCompound(false);
-                          setFeedback('idle');
-                        }}
+                        disabled={locked}
+                        onClick={() => pickSize(s)}
                       />
                     ))}
                   </div>
                 </div>
 
-                {/* Compound toggle row */}
                 <div>
-                  <p className="text-sm font-bold tracking-wide text-ink-950 mb-2">
-                    Compound <span className="text-xs text-ink-600 font-semibold">(adds an octave)</span>
+                  <p className="game-label mb-1.5">
+                    Compound <span className="game-caption font-normal">(more than an octave)</span>
                   </p>
-                  <button
-                    id="compound-toggle-button"
-                    onClick={() => {
-                      setCompound((c) => !c);
-                      setFeedback('idle');
-                    }}
-                    disabled={feedback === 'correct' || selectedSize === 'unison'}
-                    className={[
-                      'px-4 py-2 rounded-xl text-sm sm:text-base font-bold transition-all border shadow-xs',
-                      compound
-                        ? 'bg-sky-500 text-white border-sky-400 shadow-md shadow-sky-500/30 scale-105 font-extrabold'
-                        : 'bg-white text-ink-950 border-ink-300 hover:bg-ink-100 hover:border-ink-400',
-                      (feedback === 'correct' || selectedSize === 'unison') ? 'opacity-40 cursor-not-allowed' : '',
-                    ].join(' ')}
-                  >
-                    compound
-                  </button>
+                  <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
+                    <button
+                      id="compound-toggle-button"
+                      onClick={toggleCompound}
+                      disabled={locked || selectedSize === 'unison'}
+                      aria-pressed={compound}
+                      className={[
+                        'col-span-2 h-11 rounded-lg text-base font-semibold transition-all border cursor-pointer',
+                        compound
+                          ? 'bg-stone-900 text-white border-stone-900 shadow-sm'
+                          : 'bg-white text-stone-900 border-stone-300 hover:bg-stone-50 hover:border-stone-400',
+                        locked || selectedSize === 'unison' ? 'cursor-not-allowed' : '',
+                        (locked && !compound) || selectedSize === 'unison' ? 'opacity-40' : '',
+                      ].join(' ')}
+                    >
+                      Compound
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              {/* Select button - slightly less height */}
-              <div className="pt-2">
-                <button
-                  id="submit-answer-button"
-                  onClick={handleSelect}
-                  disabled={!selectedQuality || !selectedSize || feedback === 'correct'}
-                  className="w-full py-2.5 sm:py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:from-ink-300 disabled:to-ink-300 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-base transition-all shadow-lg shadow-amber-500/20 disabled:shadow-none"
-                >
-                  {feedback === 'correct'
-                    ? 'Correct! Next…'
-                    : `Select${selectedSize ? ` — ${selectedQuality ? QUALITY_SYMBOLS[selectedQuality] : '?'} ${compound ? 'compound ' : ''}${SIZE_SYMBOLS[selectedSize]}` : ''}`}
-                </button>
-                {wrongAttempts > 0 && feedback !== 'correct' && (
-                  <p className="text-center text-xs sm:text-sm text-rose-600 font-semibold mt-1.5">
-                    Not quite — try again. ({wrongAttempts} {wrongAttempts === 1 ? 'attempt' : 'attempts'} so far)
+                <div>
+                  <button
+                    id="submit-answer-button"
+                    onClick={handleCheck}
+                    disabled={!locked && (!selectedQuality || !selectedSize)}
+                    className={
+                      locked
+                        ? 'w-full min-h-[48px] py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base transition-all shadow-sm cursor-pointer'
+                        : 'w-full min-h-[48px] py-2.5 rounded-xl bg-stone-900 hover:bg-stone-800 disabled:bg-stone-300 disabled:text-stone-500 disabled:cursor-not-allowed text-white font-bold text-base transition-all shadow-sm cursor-pointer'
+                    }
+                  >
+                    {locked ? 'Next Interval' : `Check${preview ? ` — ${preview}` : ''}`}
+                  </button>
+                  <p className="keyboard-hint game-caption text-center mt-2">
+                    <Kbd>P</Kbd>
+                    <Kbd>M</Kbd>
+                    <Kbd>m</Kbd>
+                    <Kbd>d</Kbd>
+                    <Kbd>a</Kbd> quality · <Kbd>1</Kbd>–<Kbd>8</Kbd> size · <Kbd>C</Kbd> compound ·{' '}
+                    <Kbd>Enter</Kbd> checks · <Kbd>Space</Kbd> plays
+                  </p>
+                </div>
+
+                {wrongAttempts > 0 && !locked && (
+                  <p className="text-center text-sm font-semibold text-rose-700">
+                    {wrongAttempts >= 2 ? 'Not quite. Try again, or press Show answer.' : 'Not quite — try again.'}
                   </p>
                 )}
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 w-full items-stretch">
+                <button id="theory-tips-button" onClick={() => setDialog('tips')} className={toolButton}>
+                  <Lightbulb className="w-4 h-4 text-stone-600 shrink-0" />
+                  <span>Theory Tips</span>
+                </button>
+                <button id="settings-button" onClick={() => setDialog('settings')} className={toolButton}>
+                  <Settings className="w-4 h-4 text-stone-600 shrink-0" />
+                  <span>Settings</span>
+                </button>
+                <button id="show-answer-button" onClick={handleShowAnswer} disabled={locked} className={toolButton}>
+                  <Eye className="w-4 h-4 text-stone-600 shrink-0" />
+                  <span>Show answer</span>
+                </button>
               </div>
             </div>
           </div>
         </main>
       )}
 
-      {/* Theory Tips Pop-up Modal */}
-      {showTheoryTips && (
-        <div
-          id="theory-tips-modal-overlay"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-950/60 backdrop-blur-xs animate-fade-in"
-          onClick={() => setShowTheoryTips(false)}
+      {dialog === 'tips' && (
+        <Modal title="Music Theory Tips" icon={<Lightbulb className="w-5 h-5 text-stone-600" />} onClose={() => setDialog(null)}>
+          <TheoryTips />
+        </Modal>
+      )}
+      {dialog === 'settings' && (
+        <Modal
+          title="Choose your intervals"
+          icon={<Settings className="w-5 h-5 text-stone-600" />}
+          onClose={() => setDialog(null)}
+          narrow
         >
-          <div
-            id="theory-tips-popup-window"
-            onClick={(e) => e.stopPropagation()}
-            className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-ink-200 p-6 sm:p-8 relative animate-fade-in"
-          >
-            <div className="flex items-start justify-between gap-4 mb-4">
-              <div className="inline-flex items-center gap-2 text-amber-600">
-                <BookOpen className="w-5 h-5" />
-                <span className="text-xs font-semibold uppercase tracking-wider text-ink-500">Music Theory Tips</span>
-              </div>
-              <button
-                id="close-theory-tips-button"
-                onClick={() => setShowTheoryTips(false)}
-                className="text-ink-400 hover:text-ink-700 p-1.5 rounded-lg hover:bg-ink-100 transition-colors"
-                aria-label="Close"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <h3 className="text-xl sm:text-2xl font-bold text-ink-900 mb-4">
-              How to analyze music intervals on the staff.
-            </h3>
-
-            <ul className="space-y-3 text-ink-700 text-sm sm:text-base mb-6 list-disc list-outside pl-6 leading-relaxed">
-              <li>Determine size first by counting diatonic steps</li>
-              <li>Ignore accidentals and find diatonic quality</li>
-              <li>Add in accidentals one at a time to complete assessment of quality</li>
-            </ul>
-
-            <div className="pt-4 border-t border-ink-100 mb-6">
-              <h4 className="text-base sm:text-lg font-bold text-ink-900 mb-3">
-                Diatonic Interval Basics
-              </h4>
-              <ul className="space-y-2.5 text-ink-700 text-sm sm:text-base list-disc list-outside pl-6 leading-relaxed">
-                <li>All 5ths above the scale notes are perfect except above B.</li>
-                <li>All fourths above the scale notes are perfect except above F.</li>
-                <li>The 3rds above C, F, and G (1, 4, 5) are major, and all others are minor.</li>
-                <li>All seconds above the scale are major except EF and BC.</li>
-              </ul>
-            </div>
-
-            <div className="flex justify-end pt-2 border-t border-ink-100">
-              <button
-                id="dismiss-theory-tips-button"
-                onClick={() => setShowTheoryTips(false)}
-                className="px-6 py-2.5 rounded-xl bg-ink-900 hover:bg-ink-800 text-white font-medium text-sm transition-colors shadow-sm"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+          <IntervalOptionButtons selectedFamily={intervalFamily} onSelectFamily={handleFamilyChange} />
+        </Modal>
       )}
 
-      {/* Settings Pop-up Modal */}
-      {showSettings && (
-        <div
-          id="settings-modal-overlay"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-950/60 backdrop-blur-xs animate-fade-in"
-          onClick={() => setShowSettings(false)}
-        >
-          <div
-            id="settings-popup-window"
-            onClick={(e) => e.stopPropagation()}
-            className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-ink-200 p-6 sm:p-8 relative animate-fade-in"
-          >
-            <div className="flex items-start justify-between gap-4 mb-4">
-              <div className="inline-flex items-center gap-2 text-sky-600">
-                <Settings className="w-5 h-5" />
-                <span className="text-xs font-semibold uppercase tracking-wider text-ink-500">Game Settings</span>
-              </div>
-              <button
-                id="close-settings-button"
-                onClick={() => setShowSettings(false)}
-                className="text-ink-400 hover:text-ink-700 p-1.5 rounded-lg hover:bg-ink-100 transition-colors"
-                aria-label="Close"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <h3 className="text-xl sm:text-2xl font-bold text-ink-900 mb-2">
-              Game Options
-            </h3>
-            <p className="text-ink-600 text-sm mb-5">
-              Choose which intervals you want to practice:
-            </p>
-
-            <div className="mb-6">
-              <IntervalOptionButtons
-                selectedFamily={intervalFamily}
-                onSelectFamily={handleFamilyChange}
-              />
-            </div>
-
-            <div className="flex justify-end pt-3 border-t border-ink-100">
-              <button
-                id="dismiss-settings-button"
-                onClick={() => setShowSettings(false)}
-                className="px-6 py-2.5 rounded-xl bg-ink-900 hover:bg-ink-800 text-white font-medium text-sm transition-colors shadow-sm"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <footer className="mt-10 text-center text-xs text-ink-400">
-        Notation rendered with the Bravura music font (SMuFL). Sounds synthesized live.
-      </footer>
+      <footer className="mt-8 text-center text-xs text-stone-500">Online Music Learning Lab</footer>
     </div>
+  );
+}
+
+function FeedbackChip({ feedback, answer }: { feedback: Feedback; answer: string }) {
+  if (feedback === 'correct') {
+    return (
+      <div className="inline-flex items-center gap-2 py-1.5 px-4 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold text-sm animate-pop-in">
+        <span className="w-5 h-5 rounded-full bg-emerald-600 flex items-center justify-center text-white shrink-0">
+          <Check className="w-3 h-3" strokeWidth={3} />
+        </span>
+        <span>Correct — {answer}</span>
+      </div>
+    );
+  }
+  if (feedback === 'revealed') {
+    return (
+      <div className="inline-flex items-center gap-2 py-1.5 px-4 rounded-full bg-sky-50 border border-sky-200 text-sky-900 font-bold text-sm animate-pop-in">
+        <Eye className="w-4 h-4 shrink-0" />
+        <span>This is {/^[aeiou]/i.test(answer) ? 'an' : 'a'} {answer}</span>
+      </div>
+    );
+  }
+  if (feedback === 'wrong') {
+    return (
+      <div className="inline-flex items-center gap-2 py-1.5 px-4 rounded-full bg-rose-50 border border-rose-200 text-rose-800 font-bold text-sm animate-shake">
+        <span className="w-5 h-5 rounded-full bg-rose-600 flex items-center justify-center text-white shrink-0">
+          <X className="w-3 h-3" strokeWidth={3} />
+        </span>
+        <span>Try again</span>
+      </div>
+    );
+  }
+  return null;
+}
+
+function AnswerButton({
+  label,
+  ariaLabel,
+  title,
+  selected,
+  disabled,
+  onClick,
+}: {
+  key?: string; // listed so the type checker accepts React's "key" here
+  label: ReactNode;
+  ariaLabel?: string;
+  title?: string;
+  selected: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={ariaLabel}
+      aria-pressed={selected}
+      title={title}
+      className={[
+        'h-11 min-w-0 rounded-lg text-base font-semibold transition-all border cursor-pointer inline-flex items-center justify-center',
+        selected
+          ? 'bg-stone-900 text-white border-stone-900 shadow-sm'
+          : 'bg-white text-stone-900 border-stone-300 hover:bg-stone-50 hover:border-stone-400',
+        disabled && !selected ? 'opacity-40' : '',
+        disabled ? 'cursor-not-allowed' : '',
+      ].join(' ')}
+    >
+      {label}
+    </button>
   );
 }
 
@@ -507,7 +599,7 @@ function IntervalOptionButtons({
   onSelectFamily: (family: IntervalFamily) => void;
 }) {
   return (
-    <div className="flex flex-col gap-2.5 w-full">
+    <div className="flex flex-col gap-2 w-full">
       {INTERVAL_OPTIONS.map((opt) => {
         const isSelected = selectedFamily === opt.id;
         return (
@@ -516,16 +608,16 @@ function IntervalOptionButtons({
             type="button"
             id={`option-button-${opt.id}`}
             onClick={() => onSelectFamily(opt.id)}
+            aria-pressed={isSelected}
             className={[
-              'w-full text-left px-4 py-3 rounded-xl border transition-all shadow-xs',
+              'w-full min-h-[48px] text-left px-4 py-3 rounded-xl border text-sm sm:text-base font-bold transition-all cursor-pointer flex items-center justify-between gap-2',
               isSelected
-                ? 'bg-sky-50 border-sky-400 ring-2 ring-sky-300 text-sky-950 font-bold'
-                : 'bg-stone-50 hover:bg-stone-100/90 border-ink-200 text-ink-900 hover:border-ink-300 font-bold',
+                ? 'bg-stone-900 text-white border-stone-900'
+                : 'bg-white hover:bg-stone-50 text-stone-800 border-stone-300',
             ].join(' ')}
           >
-            <span className="text-sm sm:text-base font-bold leading-snug">
-              {opt.label}
-            </span>
+            <span className="leading-snug">{opt.label}</span>
+            {isSelected && <Check className="w-4 h-4 shrink-0" />}
           </button>
         );
       })}
@@ -551,181 +643,162 @@ function StartScreen({
     { name: 'Diminished', symbol: 'º' },
     { name: 'Augmented', symbol: '+' },
   ];
-
   const specialSizeSymbols = [
     { name: 'Unison', symbol: 'U' },
     { name: 'Octave', symbol: '8ve' },
   ];
 
   return (
-    <div id="start-screen" className="w-full max-w-2xl animate-fade-in">
-      <div id="start-screen-card" className="bg-white rounded-2xl shadow-xl border border-ink-200 p-5 sm:p-7">
-        <div className="flex items-center gap-2.5 mb-3 text-left">
-          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-sky-500/80 border border-sky-400/50 flex items-center justify-center shrink-0 shadow-xs backdrop-blur-xs text-white">
-            <Music2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
-          </div>
-          <h2 className="text-xl sm:text-2xl font-bold text-ink-900">
-            Directions
-          </h2>
+    <div id="start-screen" className="w-full max-w-2xl mx-auto flex flex-col items-center animate-fade-in">
+      <div id="start-screen-card" className="w-full bg-white border border-stone-200 rounded-2xl p-5 sm:p-6 shadow-sm mb-5 text-left">
+        <div className="flex items-center gap-2 mb-3 text-stone-900">
+          <Music2 className="w-5 h-5 text-stone-600 shrink-0" />
+          <span className="game-section-heading">Directions</span>
         </div>
-        <p className="text-ink-700 text-sm sm:text-base text-left leading-relaxed mb-5">
-          Two consecutive notes appear on a treble or bass staff forming a melodic interval. Choose the interval's <strong>quality</strong> and <strong>size</strong>, toggle <strong>compound</strong> if it spans more than an octave, and then press <strong>Select</strong>. A bell means correct; a buzzer means try again.
+        <p className="game-subtitle mb-2.5">Two notes appear on a treble or bass staff:</p>
+        <ul className="game-body list-disc list-inside space-y-1.5 leading-relaxed">
+          <li>Choose the interval's quality and size</li>
+          <li>Press Compound if it spans more than an octave</li>
+          <li>Press Check</li>
+        </ul>
+        <p className="keyboard-hint game-caption mt-3">
+          On a computer you can also type: <Kbd>M</Kbd>
+          <Kbd>3</Kbd> for a major 3rd, <Kbd>C</Kbd> for compound, then <Kbd>Enter</Kbd>.
         </p>
 
-        {/* Quality symbols display */}
-        <div id="quality-symbols-container" className="mb-5">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-ink-800 text-left mb-2.5">
-            Interval Quality Symbols
-          </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
-            {qualitySymbols.map((item) => (
-              <div
-                key={item.name}
-                id={`symbol-tile-${item.name.toLowerCase()}`}
-                className="bg-stone-50 border border-ink-200 rounded-xl p-2.5 sm:p-3 flex flex-col items-center justify-center text-center shadow-xs"
-              >
-                <span className="text-xs font-semibold text-ink-700 mb-0.5">{item.name}</span>
-                <span className="text-xl sm:text-2xl font-bold text-ink-900 leading-none">{item.symbol}</span>
+        <div className="mt-5 pt-4 border-t border-stone-200">
+          <p className="game-label mb-2">Interval quality symbols</p>
+          <div className="grid grid-cols-5 gap-2">
+            {qualitySymbols.map((q) => (
+              <div key={q.name} className="rounded-xl border border-stone-200 bg-stone-50 py-2 text-center">
+                <div className="text-[11px] sm:text-xs font-semibold text-stone-600">{q.name}</div>
+                <div className="text-xl font-bold text-stone-900 leading-tight">{q.symbol}</div>
+              </div>
+            ))}
+          </div>
+          <p className="game-label mt-4 mb-2">Special size symbols</p>
+          <div className="grid grid-cols-5 gap-2">
+            {specialSizeSymbols.map((s) => (
+              <div key={s.name} className="rounded-xl border border-stone-200 bg-stone-50 py-2 text-center">
+                <div className="text-[11px] sm:text-xs font-semibold text-stone-600">{s.name}</div>
+                <div className="text-xl font-bold text-stone-900 leading-tight">{s.symbol}</div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Special Size symbols display */}
-        <div id="special-size-symbols-container" className="mb-6">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-ink-800 text-left mb-2.5">
-            Special Size Symbols
-          </h3>
-          <div className="grid grid-cols-2 gap-2.5 max-w-sm">
-            {specialSizeSymbols.map((item) => (
-              <div
-                key={item.name}
-                id={`size-symbol-tile-${item.name.toLowerCase()}`}
-                className="bg-stone-50 border border-ink-200 rounded-xl p-2.5 sm:p-3 flex flex-col items-center justify-center text-center shadow-xs"
-              >
-                <span className="text-xs font-semibold text-ink-700 mb-0.5">{item.name}</span>
-                <span className="text-xl sm:text-2xl font-bold text-ink-900 leading-none">{item.symbol}</span>
-              </div>
-            ))}
+        <div className="mt-5 pt-4 border-t border-stone-200">
+          <div className="flex items-center gap-2 mb-2 text-stone-900">
+            <SlidersHorizontal className="w-4.5 h-4.5 text-stone-600 shrink-0" />
+            <span className="game-section-heading">Choose your intervals</span>
           </div>
+          <IntervalOptionButtons selectedFamily={selectedFamily} onSelectFamily={onSelectFamily} />
         </div>
+      </div>
+      <button
+        id="start-button"
+        onClick={onStart}
+        className="inline-flex items-center gap-2 min-h-[48px] px-7 py-3 rounded-xl bg-stone-900 hover:bg-stone-800 active:scale-[0.98] text-white font-bold text-base transition-all shadow-sm cursor-pointer"
+      >
+        <Play className="w-4.5 h-4.5" />
+        Start
+      </button>
+      {bestStreak > 0 && <p className="mt-3.5 text-xs text-stone-500">Best streak so far: {bestStreak}</p>}
+    </div>
+  );
+}
 
-        {/* Game Options Section */}
-        <div id="game-options-container" className="mb-6">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-ink-800 text-left mb-2.5">
-            Game Options
-          </h3>
-          <IntervalOptionButtons
-            selectedFamily={selectedFamily}
-            onSelectFamily={onSelectFamily}
-          />
-        </div>
-
-        <div className="flex flex-col items-center">
+function Modal({
+  title,
+  icon,
+  onClose,
+  narrow = false,
+  children,
+}: {
+  title: string;
+  icon: ReactNode;
+  onClose: () => void;
+  narrow?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className={`relative w-full ${narrow ? 'max-w-md' : 'max-w-lg'} max-h-[90vh] overflow-y-auto bg-white border border-stone-200 rounded-2xl p-6 shadow-xl`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <h2 className="flex items-center gap-2 text-xl font-bold text-stone-900">
+            {icon}
+            {title}
+          </h2>
           <button
-            id="start-game-button"
-            onClick={onStart}
-            className="inline-flex items-center justify-center gap-2 px-7 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-bold text-base transition-all shadow-lg shadow-amber-500/30 w-full sm:w-auto"
+            onClick={onClose}
+            aria-label="Close"
+            className="w-10 h-10 rounded-lg flex items-center justify-center text-stone-600 hover:bg-stone-100 cursor-pointer"
           >
-            <Play className="w-4 h-4" />
-            Start
+            <X className="w-5 h-5" />
           </button>
-          {bestStreak > 0 && (
-            <p className="mt-3 text-xs text-ink-500 text-center">Best streak so far: {bestStreak}</p>
-          )}
         </div>
+        {children}
       </div>
     </div>
   );
 }
 
-function StatCard({
-  label,
-  value,
-  accent,
-  icon,
-}: {
-  label: string;
-  value: string | number;
-  accent: string;
-  icon?: React.ReactNode;
-}) {
+function Kbd({ children }: { children: ReactNode }) {
   return (
-    <div className="bg-white/85 backdrop-blur rounded-xl border border-ink-200 shadow-xs px-2 py-2 text-center flex flex-col justify-center min-w-0">
-      <div className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-ink-500 truncate">{label}</div>
-      <div className={`text-base sm:text-lg font-bold mt-0.5 flex items-center justify-center gap-1 ${accent} truncate leading-tight`}>
+    <kbd className="inline-block min-w-[1.4em] px-1 py-px mx-px rounded border border-stone-300 bg-stone-50 text-[0.8em] font-semibold text-stone-800 text-center font-sans">
+      {children}
+    </kbd>
+  );
+}
+
+function TheoryTips() {
+  return (
+    <div className="space-y-3 text-stone-800 text-sm sm:text-base leading-relaxed">
+      <div className="bg-stone-50 rounded-xl p-4 border border-stone-200">
+        <h4 className="font-bold text-stone-900 text-base mb-2">How to name an interval</h4>
+        <ul className="list-disc pl-5 space-y-1.5">
+          <li>Find the size first by counting letter names (lines and spaces), including both notes.</li>
+          <li>Ignore the accidentals and find the quality of the plain interval.</li>
+          <li>Add the accidentals back one at a time and adjust the quality.</li>
+        </ul>
+      </div>
+
+      <div className="bg-stone-50 rounded-xl p-4 border border-stone-200">
+        <h4 className="font-bold text-stone-900 text-base mb-2">Intervals without accidentals</h4>
+        <ul className="list-disc pl-5 space-y-1.5">
+          <li>All 5ths above the scale notes are perfect except above B.</li>
+          <li>All 4ths above the scale notes are perfect except above F.</li>
+          <li>The 3rds above C, F and G (1, 4, 5) are major, and all others are minor.</li>
+          <li>All 2nds above the scale notes are major except E–F and B–C.</li>
+        </ul>
+      </div>
+
+      <div className="bg-stone-50 rounded-xl p-4 border border-stone-200">
+        <h4 className="font-bold text-stone-900 text-base mb-2">Compound intervals</h4>
+        <p>
+          An interval larger than an octave is compound. Take away an octave (7 letter names) to find its
+          simple size: a 9th is a compound 2nd, a 10th is a compound 3rd, and so on. The quality stays the
+          same.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function StatChip({ label, value, accent, icon }: { label: string; value: string | number; accent: string; icon?: ReactNode }) {
+  return (
+    <div className="bg-white rounded-lg border border-stone-200 shadow-2xs px-1.5 sm:px-2.5 py-1 text-center min-w-0">
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-stone-600 leading-tight">{label}</div>
+      <div className={`text-sm sm:text-base font-bold flex items-center justify-center gap-0.5 leading-tight ${accent}`}>
         {icon}
         <span>{value}</span>
       </div>
-    </div>
-  );
-}
-
-function AnswerButton({
-  label,
-  selected,
-  disabled,
-  onClick,
-  ariaLabel,
-  className,
-}: {
-  key?: React.Key;
-  label: string;
-  selected: boolean;
-  disabled: boolean;
-  onClick: () => void;
-  ariaLabel?: string;
-  className?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={ariaLabel}
-      className={[
-        'px-5 py-2.5 rounded-xl text-base sm:text-lg font-bold transition-all border shadow-xs min-w-[44px]',
-        selected
-          ? 'bg-sky-500 text-white border-sky-400 shadow-md shadow-sky-500/30 scale-105 font-extrabold'
-          : 'bg-white text-ink-950 border-ink-300 hover:bg-ink-100 hover:border-ink-400',
-        disabled && !selected ? 'opacity-40 cursor-not-allowed' : '',
-        className || '',
-      ].join(' ')}
-    >
-      {label}
-    </button>
-  );
-}
-
-function FeedbackPanel({ feedback }: { feedback: Feedback }) {
-  if (feedback === 'correct') {
-    return (
-      <div className="flex flex-col items-center justify-center gap-2 animate-pop-in">
-        <div className="w-20 h-20 rounded-full bg-emerald-500 flex items-center justify-center animate-glow-green">
-          <Check className="w-12 h-12 text-white" strokeWidth={3} />
-        </div>
-        <span className="text-emerald-400 font-semibold text-sm">Correct!</span>
-      </div>
-    );
-  }
-
-  if (feedback === 'wrong') {
-    return (
-      <div className="flex flex-col items-center justify-center gap-2 animate-shake">
-        <div className="w-20 h-20 rounded-full bg-rose-500 flex items-center justify-center animate-glow-red">
-          <X className="w-12 h-12 text-white" strokeWidth={3} />
-        </div>
-        <span className="text-rose-400 font-semibold text-sm">Try again</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col items-center justify-center gap-2">
-      <div className="w-20 h-20 rounded-full border-2 border-dashed border-ink-300 flex items-center justify-center">
-        <Music2 className="w-9 h-9 text-ink-400" />
-      </div>
-      <span className="text-ink-400 text-xs font-medium">Your answer</span>
     </div>
   );
 }

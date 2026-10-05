@@ -1,10 +1,11 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { SplendidGrandPiano } from 'smplr';
 import { midiNumber, type Note } from '@/music';
+import { PIANO_SAMPLE_OPTIONS } from '@/pianoSamples';
 
 /**
- * Audio helpers: uses SplendidGrandPiano sampled soundfont for high-quality
- * grand piano playback of intervals, plus auditory feedback for answers.
+ * Audio helpers: plays intervals with the grand piano recordings stored on
+ * this site (public/piano), plus sound effects for right and wrong answers.
  */
 export function useAudio() {
   const ctxRef = useRef<AudioContext | null>(null);
@@ -21,7 +22,7 @@ export function useAudio() {
       ctxRef.current.resume();
     }
     if (!pianoRef.current && ctxRef.current) {
-      pianoRef.current = new SplendidGrandPiano(ctxRef.current);
+      pianoRef.current = new SplendidGrandPiano(ctxRef.current, { ...PIANO_SAMPLE_OPTIONS });
     }
     return ctxRef.current;
   }, []);
@@ -29,10 +30,27 @@ export function useAudio() {
   const getPiano = useCallback(() => {
     const ctx = getCtx();
     if (!pianoRef.current) {
-      pianoRef.current = new SplendidGrandPiano(ctx);
+      pianoRef.current = new SplendidGrandPiano(ctx, { ...PIANO_SAMPLE_OPTIONS });
     }
     return pianoRef.current;
   }, [getCtx]);
+
+  // Start loading the piano on the first tap or key press, so it is ready sooner.
+  useEffect(() => {
+    const preload = () => {
+      try {
+        getPiano();
+      } catch {
+        // Ignore
+      }
+    };
+    window.addEventListener('pointerdown', preload, { once: true });
+    window.addEventListener('keydown', preload, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', preload);
+      window.removeEventListener('keydown', preload);
+    };
+  }, [getPiano]);
 
   const playTone = useCallback(
     (
@@ -62,16 +80,21 @@ export function useAudio() {
     (notes: Note[]) => {
       const ctx = getCtx();
       const piano = getPiano();
-      const now = ctx.currentTime;
-      notes.forEach((n, i) => {
-        const midi = midiNumber(n);
-        piano.start({
-          note: midi,
-          velocity: 90,
-          duration: 1.5,
-          time: now + i * 0.55,
-        });
-      });
+      // Wait until the recordings have loaded (the first notes would otherwise
+      // be silent while they download), then play the notes one after another.
+      piano.ready
+        .then(() => {
+          const now = ctx.currentTime;
+          notes.forEach((n, i) => {
+            piano.start({
+              note: midiNumber(n),
+              velocity: 90,
+              duration: 1.5,
+              time: now + 0.05 + i * 0.55,
+            });
+          });
+        })
+        .catch(() => {});
     },
     [getCtx, getPiano],
   );
