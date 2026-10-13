@@ -517,7 +517,7 @@ export default function App() {
         </Modal>
       )}
 
-      <footer className="mt-8 text-center text-xs text-stone-500">Online Music Learning Lab</footer>
+      <footer className="mt-8 text-center text-xs text-stone-500">Music Learning Lab</footer>
     </div>
   );
 }
