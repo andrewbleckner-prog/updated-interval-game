@@ -1,0 +1,16 @@
+/* Fonts served from this site instead of Google Fonts (privacy).
+   Licenses (SIL Open Font License) are in this folder. */
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('/fonts/PlusJakartaSans-VariableFont_wght.woff') format('woff');
+}
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: italic;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('/fonts/PlusJakartaSans-Italic-VariableFont_wght.woff') format('woff');
+}
