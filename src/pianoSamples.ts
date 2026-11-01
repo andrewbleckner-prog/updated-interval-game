@@ -15,6 +15,9 @@ export const PIANO_SAMPLE_OPTIONS = {
   baseUrl: '/piano',
   notesToLoad: { notes: ALL_MIDI_NOTES, velocityRange: [78, 95] as [number, number] },
   storage: {
-    fetch: (url: string) => fetch(url.replace(/%20/g, '-').replace(/%23/g, 's')),
+    // Cloudflare (unlike Netlify) treats capital letters in file names as different,
+    // so the library's 'MF' layer name is mapped to the 'Mf' files stored here.
+    fetch: (url: string) =>
+      fetch(url.replace(/%20/g, '-').replace(/%23/g, 's').replace('/MF-', '/Mf-')),
   },
 };
